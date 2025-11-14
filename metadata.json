@@ -1,0 +1,5 @@
+
+{
+  "name": "HealthFlow Platform",
+  "description": "An analytics platform for healthcare professionals to input procedure data and receive performance predictions and analysis based on a Gaussian model. It helps in understanding procedure timings, predicting delays, and optimizing scheduling."
+}
