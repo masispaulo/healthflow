@@ -10,13 +10,11 @@ export default defineConfig(({ mode }) => {
         port: 3000,
         host: '0.0.0.0',
       },
-      // --- ADICIONE ISSO AQUI ---
       // Isso é pro 'npm run preview' (Google Cloud)
       preview: {
         port: 8080,        // A porta que o Google espera
         host: '0.0.0.0',   // Para o Google "ver" o servidor
       },
-      // --- FIM DA ADIÇÃO ---
       plugins: [react()],
       define: {
         'process.env.API_KEY': JSON.stringify(env.VITE_API_KEY),
