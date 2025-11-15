@@ -21,14 +21,14 @@
     # -------------------------------------------------------------------------
     FROM nginx:stable-alpine
     
-    # Copia os arquivos de build (MUITO IMPORTANTE: /app/dist é a pasta de saída do Vite)
-    # Copia todo o conteúdo da pasta 'dist' do estágio anterior para o diretório de serviço do Nginx
-    COPY --from=build-stage /app/dist /usr/share/nginx/html
+    # ========================================================================
+    # A CORREÇÃO ESTÁ AQUI (Adicionamos /.)
+    # Copia o CONTEÚDO da pasta /app/dist para o diretório do Nginx
+    COPY --from=build-stage /app/dist/. /usr/share/nginx/html
+    # ========================================================================
     
     # Copia o arquivo de configuração customizado do Nginx (com a correção do MIME Type)
     COPY nginx.conf /etc/nginx/nginx.conf
     
     # Expõe a porta que o Nginx está escutando (8080)
     EXPOSE 8080
-    
-    # Comando padrão de start do Nginx (Não precisa de 'CMD' se for padrão)
