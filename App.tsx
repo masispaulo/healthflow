@@ -1,5 +1,5 @@
 // src/App.tsx
-// VERSÃO FINAL: Com regra de segurança (Mínimo 2 procedimentos)
+// VERSÃO FINAL: Layout Vertical (Full Width) para evitar distorção dos gráficos
 
 import React, { useState, useMemo } from 'react';
 import { useAuth } from './services/useAuth';
@@ -41,9 +41,7 @@ export const App: React.FC = () => {
   const { procedures, loading: proceduresLoading } = useProcedures(selectedShiftId);
 
   const analysis = useMemo(() => {
-    // --- REGRA DE SEGURANÇA ---
-    // Precisamos de pelo menos 2 procedimentos para ter desvio padrão.
-    // Se tiver menos de 2, retornamos null para não quebrar o gráfico.
+    // Regra de Segurança: Mínimo 2 procedimentos
     if (!procedures || procedures.length < 2) return null;
 
     const durations = procedures.map(p => Number(p.duration));
@@ -61,52 +59,62 @@ export const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 p-4 md:p-8">
       <Header />
-      <main className="container mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
+      
+      {/* MUDANÇA AQUI: Removemos o 'grid-cols-3' e usamos layout vertical simples */}
+      <main className="container mx-auto mt-6 space-y-8 max-w-5xl">
         
-        {/* ESQUERDA */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* SEÇÃO 1: CONFIGURAÇÕES E LOCAIS */}
+        <section>
           <LocationsManager />
-          <ScheduleCalendar 
+        </section>
+
+        {/* SEÇÃO 2: AGENDA E PROCEDIMENTOS */}
+        <section>
+           <ScheduleCalendar 
             selectedShiftId={selectedShiftId}
             onShiftSelected={setSelectedShiftId}
           />
-        </div>
+        </section>
 
-        {/* DIREITA */}
-        <div className="lg:col-span-1 space-y-6">
-          
-          {proceduresLoading && selectedShiftId && (
-             <div className="text-center p-4 text-slate-400">Carregando dados...</div>
-          )}
+        {/* SEÇÃO 3: ANÁLISE INTELIGENTE (LARGURA TOTAL) */}
+        {/* Esta seção agora tem espaço total para respirar e não distorcer */}
+        <section className="border-t border-slate-700 pt-8">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                📊 Análise de Performance do Plantão
+            </h2>
 
-          {/* Só mostra o Dashboard se tiver análise válida (2+ procedimentos) */}
-          {analysis && !proceduresLoading && (
-            <AnalysisDashboard 
-                analysis={analysis as any} 
-                procedureCount={procedures.length} 
-            />
-          )}
+            {proceduresLoading && selectedShiftId && (
+                <div className="text-center p-4 text-slate-400">Carregando dados...</div>
+            )}
 
-          {/* Mensagem específica para quando tem pouco dado */}
-          {!analysis && !proceduresLoading && selectedShiftId && (
-             <div className="text-center p-6 bg-slate-800 rounded-lg border border-slate-700 text-slate-400">
-                <p className="mb-2 text-xl">📉 Dados Insuficientes</p>
-                <p className="text-sm mb-4">
-                  Você tem <strong>{procedures.length}</strong> procedimento(s) registrado(s).
-                </p>
-                <p className="text-sm text-yellow-400">
-                  ⚠️ Adicione pelo menos <strong>2 procedimentos</strong> para que o sistema possa calcular a variabilidade e gerar a Curva de Gauss.
-                </p>
-             </div>
-          )}
-          
-          {!selectedShiftId && (
-            <div className="text-center p-6 bg-slate-800 rounded-lg border border-slate-700 text-slate-400">
-              <p>👈 Selecione um plantão ao lado para ver a análise.</p>
-            </div>
-          )}
+            {/* Só mostra o Dashboard se tiver análise válida */}
+            {analysis && !proceduresLoading && (
+                <AnalysisDashboard 
+                    analysis={analysis as any} 
+                    procedureCount={procedures.length} 
+                />
+            )}
 
-        </div>
+            {/* Mensagem de dados insuficientes */}
+            {!analysis && !proceduresLoading && selectedShiftId && (
+                <div className="text-center p-8 bg-slate-800 rounded-lg border border-slate-700 text-slate-400">
+                    <p className="mb-2 text-xl">📉 Dados Insuficientes para Análise</p>
+                    <p className="text-sm mb-4">
+                    Você tem <strong>{procedures.length}</strong> procedimento(s) registrado(s) neste plantão.
+                    </p>
+                    <p className="text-sm text-yellow-400">
+                    ⚠️ Adicione pelo menos <strong>2 procedimentos</strong> acima para gerar a Curva de Gauss e as métricas de risco.
+                    </p>
+                </div>
+            )}
+            
+            {!selectedShiftId && (
+                <div className="text-center p-12 bg-slate-800/50 rounded-lg border border-dashed border-slate-700 text-slate-500">
+                <p className="text-lg">👈 Selecione um plantão na agenda acima para visualizar a análise de fadiga e eficiência.</p>
+                </div>
+            )}
+        </section>
+
       </main>
     </div>
   );
