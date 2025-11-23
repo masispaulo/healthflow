@@ -1,128 +1,111 @@
 // src/App.tsx
-// VERSÃO CORRIGIDA (com e sem chaves, corretamente)
+// VERSÃO FINAL: Com regra de segurança (Mínimo 2 procedimentos)
 
 import React, { useState, useMemo } from 'react';
-import { useAuth } from './services/useAuth'; // Seu hook de autenticação
-import { useProcedures } from './services/useProcedures'; // O hook de procedimentos
+import { useAuth } from './services/useAuth';
+import { useProcedures } from './services/useProcedures';
 
-// --- Seus Componentes Visuais ---
+// Cérebro Matemático
+import { calculateAnalysis } from './services/gaussianService'; 
 
-// Componentes que VOCÊ JÁ TINHA (export default) -> SEM CHAVES {}
+// Componentes Visuais
 import Header from './components/Header';
 import AnalysisDashboard from './components/AnalysisDashboard';
-import RosterPlanner from './components/RosterPlanner';
-import GeminiInsights from './components/GeminiInsights';
-
-// Componentes NOVOS QUE CRIAMOS (export const) -> COM CHAVES {}
 import { LocationsManager } from './components/LocationsManager';
 import { ScheduleCalendar } from './components/ScheduleCalendar';
 
-// Seus Tipos (do types.ts) -> COM CHAVES {}
-import { Procedure, AnalysisResults, ScheduleEntry } from './types';
+// Tipos
+import { Procedure } from './types';
 
-// --- Componente de Login (Simples) ---
 const LoginScreen = () => {
-  const { signInWithGoogle } = useAuth(); // Supondo que useAuth tem essa função
+  const { signInWithGoogle } = useAuth();
   return (
     <div className="flex items-center justify-center min-h-screen bg-slate-900">
-      <button
-        onClick={signInWithGoogle}
-        className="px-6 py-3 bg-blue-600 text-white font-bold rounded-lg"
-      >
-        Entrar com Google
-      </button>
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-white mb-6">HealthFlow Platform</h1>
+        <button
+          onClick={signInWithGoogle}
+          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-all"
+        >
+          Entrar com Google
+        </button>
+      </div>
     </div>
   );
 };
 
-// --- O Aplicativo Principal ---
 export const App: React.FC = () => {
-  // 1. Gerenciamento de Estado Centralizado
   const { user, loading: authLoading } = useAuth();
-
-  // ID do plantão (shift) que o usuário selecionou no ScheduleCalendar
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
 
-  // 2. Busca de Dados
-  // Busca os procedimentos APENAS para o plantão selecionado
-  const { procedures, loading: proceduresLoading } =
-    useProcedures(selectedShiftId);
+  const { procedures, loading: proceduresLoading } = useProcedures(selectedShiftId);
 
-  // 3. Funções de Análise (do seu App.tsx original)
-  // Re-calcula a análise SOMENTE quando a lista de procedimentos mudar
   const analysis = useMemo(() => {
-    if (procedures.length === 0) return null;
-    // Chame sua função de cálculo (provavelmente do gaussianService)
-    // Exemplo: return calculateAnalysis(procedures);
-    // Por enquanto, vamos passar os procedimentos brutos
-    return { procedures: procedures as Procedure[] }; // Adapte para o tipo AnalysisResults
+    // --- REGRA DE SEGURANÇA ---
+    // Precisamos de pelo menos 2 procedimentos para ter desvio padrão.
+    // Se tiver menos de 2, retornamos null para não quebrar o gráfico.
+    if (!procedures || procedures.length < 2) return null;
+
+    const durations = procedures.map(p => Number(p.duration));
+    const result = calculateAnalysis(durations);
+
+    return {
+        ...result,
+        procedures: procedures as Procedure[] 
+    }; 
   }, [procedures]);
 
-  // (Lógica para RosterPlanner e GeminiInsights - pode ser adicionada depois)
-  const [analysisResults, setAnalysisResults] =
-    useState<AnalysisResults | null>(null);
-  const [geminiInsights, setGeminiInsights] = useState<string>('');
-  const [isGeminiLoading, setIsGeminiLoading] = useState(false);
-  const [schedule, setSchedule] = useState<ScheduleEntry[] | null>(null);
+  if (authLoading) return <div className="bg-slate-900 min-h-screen flex items-center justify-center text-white">Carregando...</div>;
+  if (!user) return <LoginScreen />;
 
-  // --- Renderização ---
-
-  if (authLoading) {
-    return <div className="bg-slate-900 min-h-screen text-white">Carregando...</div>;
-  }
-
-  if (!user) {
-    return <LoginScreen />;
-  }
-
-  // O Médico está logado
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 p-4 md:p-8">
       <Header />
       <main className="container mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
-        {/* === COLUNA DA ESQUERDA: Gerenciamento === */}
+        
+        {/* ESQUERDA */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Componente para gerenciar locais (Passo 1) */}
           <LocationsManager />
-
-          {/* Componente de Calendário/Plantões (Passo 2+3) */}
-          <ScheduleCalendar
+          <ScheduleCalendar 
             selectedShiftId={selectedShiftId}
             onShiftSelected={setSelectedShiftId}
           />
         </div>
 
-        {/* === COLUNA DA DIREITA: Análise === */}
+        {/* DIREITA */}
         <div className="lg:col-span-1 space-y-6">
-          {/* SEU DASHBOARD DE ANÁLISE! */}
+          
           {proceduresLoading && selectedShiftId && (
-            <p>Carregando análise do plantão...</p>
+             <div className="text-center p-4 text-slate-400">Carregando dados...</div>
           )}
 
+          {/* Só mostra o Dashboard se tiver análise válida (2+ procedimentos) */}
           {analysis && !proceduresLoading && (
-            <AnalysisDashboard
-              analysis={analysis}
-              procedureCount={procedures.length}
+            <AnalysisDashboard 
+                analysis={analysis as any} 
+                procedureCount={procedures.length} 
             />
           )}
 
+          {/* Mensagem específica para quando tem pouco dado */}
           {!analysis && !proceduresLoading && selectedShiftId && (
-            <p className="text-center p-4 bg-slate-800 rounded-lg">
-              Nenhum procedimento registrado para este plantão.
-            </p>
+             <div className="text-center p-6 bg-slate-800 rounded-lg border border-slate-700 text-slate-400">
+                <p className="mb-2 text-xl">📉 Dados Insuficientes</p>
+                <p className="text-sm mb-4">
+                  Você tem <strong>{procedures.length}</strong> procedimento(s) registrado(s).
+                </p>
+                <p className="text-sm text-yellow-400">
+                  ⚠️ Adicione pelo menos <strong>2 procedimentos</strong> para que o sistema possa calcular a variabilidade e gerar a Curva de Gauss.
+                </p>
+             </div>
           )}
-
+          
           {!selectedShiftId && (
-            <p className="text-center p-4 bg-slate-800 rounded-lg">
-              Selecione um plantão na lista à esquerda para ver a análise.
-            </p>
+            <div className="text-center p-6 bg-slate-800 rounded-lg border border-slate-700 text-slate-400">
+              <p>👈 Selecione um plantão ao lado para ver a análise.</p>
+            </div>
           )}
 
-          {/* Seus outros componentes de IA podem ser alimentados
-            com 'analysis' ou 'procedures' da mesma forma.
-          */}
-          {/* <GeminiInsights ... /> */}
-          {/* <RosterPlanner ... /> */}
         </div>
       </main>
     </div>
