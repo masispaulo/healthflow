@@ -1,90 +1,60 @@
-import { AnalysisResults } from '../types';
+// src/services/gaussianService.ts
 
+export interface AnalysisResults {
+  mean: number;
+  stdDev: number;
+  percentiles: { [key: number]: number }; // <--- O Dashboard precisa disto aqui
+  dataPoints: number[];
+}
+
+// Função auxiliar para calcular a média
 const calculateMean = (data: number[]): number => {
   if (data.length === 0) return 0;
-  const sum = data.reduce((acc, val) => acc + val, 0);
+  const sum = data.reduce((a, b) => a + b, 0);
   return sum / data.length;
 };
 
+// Função auxiliar para calcular o desvio padrão
 const calculateStdDev = (data: number[], mean: number): number => {
   if (data.length < 2) return 0;
-  const variance = data.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / (data.length - 1);
-  return Math.sqrt(variance);
+  const squareDiffs = data.map((value) => Math.pow(value - mean, 2));
+  const avgSquareDiff = calculateMean(squareDiffs);
+  return Math.sqrt(avgSquareDiff);
 };
 
-// Probability Density Function (PDF) for a normal distribution
-export const probabilityDensityFunction = (x: number, mean: number, stdDev: number): number => {
-  if (stdDev === 0) return x === mean ? Infinity : 0;
-  const exponent = -Math.pow(x - mean, 2) / (2 * Math.pow(stdDev, 2));
-  return (1 / (stdDev * Math.sqrt(2 * Math.PI))) * Math.exp(exponent);
+// Função auxiliar para calcular percentis
+const calculatePercentile = (data: number[], percentile: number): number => {
+  if (data.length === 0) return 0;
+  const sorted = [...data].sort((a, b) => a - b);
+  const index = (percentile / 100) * (sorted.length - 1);
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  const weight = index - lower;
+  
+  if (upper >= sorted.length) return sorted[sorted.length - 1];
+  return sorted[lower] * (1 - weight) + sorted[upper] * weight;
 };
-
-
-// Approximation of the error function erf(x)
-const erf = (x: number): number => {
-  // constants
-  const a1 =  0.254829592;
-  const a2 = -0.284496736;
-  const a3 =  1.421413741;
-  const a4 = -1.453152027;
-  const a5 =  1.061405429;
-  const p  =  0.3275911;
-
-  const sign = (x >= 0) ? 1 : -1;
-  x = Math.abs(x);
-
-  const t = 1.0 / (1.0 + p * x);
-  const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
-
-  return sign * y;
-}
-
-// Cumulative Distribution Function (CDF) for a standard normal distribution
-const standardNormalCDF = (z: number): number => {
-    return 0.5 * (1 + erf(z / Math.sqrt(2)));
-}
-
-// Calculate P(X > limit)
-export const calculateProbability = (limit: number, mean: number, stdDev: number): number => {
-    if (stdDev === 0) return limit < mean ? 1 : 0;
-    const z = (limit - mean) / stdDev;
-    return 1 - standardNormalCDF(z);
-};
-
-// Calculate value at a given percentile (Inverse CDF)
-// This is a simple numerical approximation
-export const calculatePercentile = (percentile: number, mean: number, stdDev: number): number => {
-    if (stdDev === 0) return mean;
-    if (percentile <= 0) return mean - 5 * stdDev; // Practical lower bound
-    if (percentile >= 1) return mean + 5 * stdDev; // Practical upper bound
-    
-    // Start with a reasonable guess and iterate
-    let x = mean;
-    const step = stdDev / 10;
-    
-    // Find a bracketing interval [low, high]
-    let low = mean - 5 * stdDev;
-    let high = mean + 5 * stdDev;
-
-    // Bisection method for finding the root
-    for(let i=0; i<100; i++){ // 100 iterations for precision
-        let mid = (low + high) / 2;
-        let z = (mid - mean) / stdDev;
-        if(standardNormalCDF(z) < percentile) {
-            low = mid;
-        } else {
-            high = mid;
-        }
-    }
-    return (low + high) / 2;
-}
 
 export const calculateAnalysis = (dataPoints: number[]): AnalysisResults | null => {
-  if (dataPoints.length < 2) return null;
+  // Trava de segurança
+  if (!dataPoints || dataPoints.length < 2) return null;
 
   const mean = calculateMean(dataPoints);
   const stdDev = calculateStdDev(dataPoints, mean);
-  const percentile95 = calculatePercentile(0.95, mean, stdDev);
+  
+  // AQUI ESTÁ A CORREÇÃO: Criamos o objeto completo 'percentiles'
+  const percentiles = {
+      50: calculatePercentile(dataPoints, 50),
+      75: calculatePercentile(dataPoints, 75),
+      90: calculatePercentile(dataPoints, 90),
+      95: calculatePercentile(dataPoints, 95),
+      99: calculatePercentile(dataPoints, 99),
+  };
 
-  return { mean, stdDev, dataPoints, percentile95 };
+  return {
+    mean,
+    stdDev,
+    percentiles, // Enviamos o objeto completo
+    dataPoints
+  };
 };
