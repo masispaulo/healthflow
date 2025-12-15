@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useShifts } from '../services/useShifts';
 import { User } from 'firebase/auth';
-import { TrashIcon, PlusIcon, CalendarIcon, ClockIcon, MapPinIcon } from './Icons';
+import { TrashIcon, PlusIcon, CalendarIcon, ClockIcon, MapPinIcon } from './icons';
 
 interface ScheduleCalendarProps {
   user: User | null;
