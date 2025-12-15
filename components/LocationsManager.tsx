@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TrashIcon, PlusIcon, MapPinIcon } from './Icons';
+import { TrashIcon, PlusIcon, MapPinIcon } from './icons';
 
 interface LocationsManagerProps {
   locations: any[]; 
