@@ -18,9 +18,16 @@ const AnalysisDashboard: React.FC<AnalysisDashboardProps> = ({ analysis, procedu
   const mean = analysis?.mean ?? 0;
   const stdDev = analysis?.stdDev ?? 0;
   const percentiles = analysis?.percentiles ?? { 95: 0 };
-  
-  const [targetTime, setTargetTime] = useState<number>(Math.round(mean + stdDev) || 60);
+   
+  const [targetTime, setTargetTime] = useState<number>(0);
   const [fatigue, setFatigue] = useState<FatigueResult | null>(null);
+
+  // Atualiza o targetTime inicial quando a análise carrega
+  useEffect(() => {
+    if (mean && stdDev) {
+        setTargetTime(Math.round(mean + stdDev));
+    }
+  }, [mean, stdDev]);
 
   useEffect(() => {
       if (!procedures || procedures.length === 0) return;
@@ -30,9 +37,7 @@ const AnalysisDashboard: React.FC<AnalysisDashboardProps> = ({ analysis, procedu
 
       procedures.forEach(p => {
           if (p.startTime < earliestStart) earliestStart = p.startTime;
-          if (p.endTime > latestEnd || (p.endTime < p.startTime)) {
-             latestEnd = p.endTime; 
-          }
+          if (p.endTime > latestEnd) latestEnd = p.endTime; 
       });
 
       const result = calculateFatigueScore(earliestStart, latestEnd);
@@ -42,6 +47,7 @@ const AnalysisDashboard: React.FC<AnalysisDashboardProps> = ({ analysis, procedu
   const calculateProbability = (target: number, mean: number, stdDev: number) => {
     if (stdDev === 0 || mean === 0) return 0;
     const z = (target - mean) / stdDev;
+    // Aproximação da função erro para probabilidade cumulativa
     const t = 1 / (1 + 0.2316419 * Math.abs(z));
     const d = 0.3989422804014337 * Math.exp(-z * z / 2);
     let prob = d * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
@@ -52,8 +58,9 @@ const AnalysisDashboard: React.FC<AnalysisDashboardProps> = ({ analysis, procedu
   const riskProbability = (1 - calculateProbability(targetTime, mean, stdDev)) * 100;
 
   return (
-    <div className="space-y-6 animation-fade-in">
-      
+    <div className="space-y-6 animate-fade-in-up">
+       
+      {/* 1. SEÇÃO DE FADIGA (Topo) */}
       {fatigue && (
         <div className="bg-slate-800 p-6 rounded-lg border border-slate-700 shadow-lg relative overflow-hidden">
             <div className="flex flex-col md:flex-row justify-between items-center relative z-10 gap-6">
@@ -76,56 +83,77 @@ const AnalysisDashboard: React.FC<AnalysisDashboardProps> = ({ analysis, procedu
                     </div>
                 </div>
             </div>
+            {/* Barra de Progresso da Fadiga */}
             <div className="w-full bg-slate-700/50 h-3 rounded-full mt-8 overflow-hidden relative">
-                <div className="absolute top-0 bottom-0 w-0.5 bg-yellow-500/50 z-20" style={{ left: `${(16.9/25)*100}%` }}></div>
-                <div className="absolute top-0 bottom-0 w-0.5 bg-red-500/50 z-20" style={{ left: `${(20.0/25)*100}%` }}></div>
-                <div className={`h-full transition-all duration-1000 ease-out ${fatigue.status === 'CRITICAL' ? 'bg-red-600' : fatigue.status === 'WARNING' ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${Math.min((fatigue.score / 25) * 100, 100)}%` }}></div>
+                {/* Marcadores de limite */}
+                <div className="absolute top-0 bottom-0 w-0.5 bg-yellow-500/50 z-20" style={{ left: `${(16.9/25)*100}%` }} title="Início Atenção"></div>
+                <div className="absolute top-0 bottom-0 w-0.5 bg-red-500/50 z-20" style={{ left: `${(20.0/25)*100}%` }} title="Início Crítico"></div>
+                
+                <div 
+                    className={`h-full transition-all duration-1000 ease-out ${fatigue.status === 'CRITICAL' ? 'bg-red-600' : fatigue.status === 'WARNING' ? 'bg-yellow-500' : 'bg-green-500'}`} 
+                    style={{ width: `${Math.min((fatigue.score / 25) * 100, 100)}%` }}
+                ></div>
             </div>
         </div>
       )}
 
+      {/* 2. DADOS ESTATÍSTICOS E GRÁFICO */}
       {analysis ? (
         <>
+          {/* Grid de 4 Cards Informativos */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 shadow-lg">
+            <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 shadow-lg hover:border-indigo-500/50 transition-colors">
                 <p className="text-xs text-slate-400 uppercase font-semibold">Tempo Médio (μ)</p>
                 <p className="text-2xl font-bold text-white">{mean.toFixed(1)} <span className="text-sm font-normal text-slate-500">min</span></p>
             </div>
-            <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 shadow-lg">
+            <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 shadow-lg hover:border-indigo-500/50 transition-colors">
                 <p className="text-xs text-slate-400 uppercase font-semibold">Desvio Padrão (σ)</p>
                 <p className="text-2xl font-bold text-white">{stdDev.toFixed(1)} <span className="text-sm font-normal text-slate-500">min</span></p>
             </div>
-            <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 shadow-lg">
+            <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 shadow-lg hover:border-indigo-500/50 transition-colors">
                 <p className="text-xs text-slate-400 uppercase font-semibold">P95 (Teto)</p>
                 <p className="text-2xl font-bold text-white">{percentiles[95]?.toFixed(0)} <span className="text-sm font-normal text-slate-500">min</span></p>
             </div>
-             <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 shadow-lg">
+             <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 shadow-lg hover:border-indigo-500/50 transition-colors">
                 <p className="text-xs text-slate-400 uppercase font-semibold">Risco Estimado</p>
-                <p className={`text-2xl font-bold ${riskProbability > 50 ? 'text-red-400' : 'text-green-400'}`}>{riskProbability.toFixed(1)}%</p>
+                <p className={`text-2xl font-bold ${riskProbability > 50 ? 'text-red-400' : 'text-emerald-400'}`}>{riskProbability.toFixed(1)}%</p>
             </div>
           </div>
 
+          {/* Gráfico + Simulador */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Coluna Larga: Gráfico */}
             <div className="lg:col-span-2 bg-slate-800 p-6 rounded-lg border border-slate-700 shadow-lg">
-              <h3 className="text-lg font-bold text-white mb-1">Curva de Distribuição Normal</h3>
+              <h3 className="text-lg font-bold text-white mb-4">Curva de Distribuição Normal</h3>
               <div className="h-[300px] w-full">
+                {/* AQUI ESTÁ O GRÁFICO RECHARTS */}
                 <BellCurveChart mean={mean} stdDev={stdDev} targetTime={targetTime} />
               </div>
             </div>
+            
+            {/* Coluna Estreita: Simulador */}
             <div className="lg:col-span-1 bg-slate-800 p-6 rounded-lg border border-slate-700 shadow-lg flex flex-col justify-center">
               <h3 className="text-lg font-bold text-white mb-4">Simular Risco</h3>
-              <input type="number" value={targetTime} onChange={(e) => setTargetTime(Number(e.target.value))} className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white mb-4" />
-              <div className="text-center">
-                <p className={`text-5xl font-black ${riskProbability > 50 ? 'text-red-500' : 'text-blue-500'}`}>{riskProbability.toFixed(1)}%</p>
-                <p className="text-slate-400 text-sm">Chance de estourar</p>
+              <label className="text-xs text-slate-400 mb-1">Definir tempo alvo (min)</label>
+              <input 
+                type="number" 
+                value={targetTime} 
+                onChange={(e) => setTargetTime(Number(e.target.value))} 
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white mb-6 text-center text-xl font-bold focus:ring-2 focus:ring-indigo-500 outline-none" 
+              />
+              <div className="text-center p-4 bg-slate-900 rounded-lg border border-slate-700">
+                <p className="text-xs text-slate-400 uppercase mb-1">Probabilidade de Exceder</p>
+                <p className={`text-5xl font-black ${riskProbability > 50 ? 'text-red-500' : 'text-indigo-500'}`}>
+                    {riskProbability.toFixed(1)}%
+                </p>
               </div>
             </div>
           </div>
         </>
       ) : (
-        <div className="text-center p-8 bg-slate-800/50 rounded-lg border border-dashed border-slate-700 text-slate-400">
+        <div className="text-center p-12 bg-slate-800/30 rounded-lg border border-dashed border-slate-700 text-slate-400">
             <p className="text-lg mb-2">📊 Coletando Dados...</p>
-            <p className="text-sm">Adicione mais <strong>1 procedimento</strong> para liberar a Análise Gaussiana Completa.</p>
+            <p className="text-sm">O sistema precisa de pelo menos 2 procedimentos para traçar a curva de normalidade.</p>
         </div>
       )}
     </div>

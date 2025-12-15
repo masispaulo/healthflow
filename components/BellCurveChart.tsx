@@ -1,67 +1,92 @@
-// src/components/BellCurveChart.tsx
-import React, { useMemo } from 'react';
+import React from 'react';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, ComposedChart
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine
 } from 'recharts';
 
 interface BellCurveChartProps {
   mean: number;
   stdDev: number;
-  targetTime?: number;
+  targetTime: number;
 }
 
 const BellCurveChart: React.FC<BellCurveChartProps> = ({ mean, stdDev, targetTime }) => {
-  const data = useMemo(() => {
-    if (stdDev === 0) return [];
-    const points = [];
-    const start = Math.max(0, mean - 3 * stdDev);
-    const end = mean + 4 * stdDev;
-    const steps = 100;
-    const stepSize = (end - start) / steps;
+  if (!mean || !stdDev) return null;
 
-    for (let i = 0; i <= steps; i++) {
-      const x = start + i * stepSize;
-      const exponent = -((x - mean) ** 2) / (2 * stdDev ** 2);
-      const y = (1 / (stdDev * Math.sqrt(2 * Math.PI))) * Math.exp(exponent);
-      points.push({ x, y });
+  // Gera os dados matemáticos para a curva suave
+  const data = [];
+  const range = stdDev * 4;
+  const startX = Math.max(0, mean - range);
+  const endX = mean + range;
+  const steps = 100; // Resolução da curva
+
+  for (let i = 0; i <= steps; i++) {
+    const x = startX + (i * (endX - startX)) / steps;
+    // Fórmula da Distribuição Normal
+    const exponent = -0.5 * Math.pow((x - mean) / stdDev, 2);
+    const y = (1 / (stdDev * Math.sqrt(2 * Math.PI))) * Math.exp(exponent);
+    data.push({
+      x: Number(x.toFixed(1)), // Arredonda para ficar bonito no eixo
+      y: y,
+      prob: (y * 100).toFixed(4) // Para o tooltip
+    });
+  }
+
+  // Tooltip customizado igual ao da nuvem
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-slate-900 border border-slate-700 p-3 rounded shadow-xl text-xs">
+          <p className="text-slate-400 mb-1">Duração: <span className="text-white font-bold">{label} min</span></p>
+          <p className="text-indigo-400">Probabilidade: {payload[0].value.toFixed(5)}</p>
+        </div>
+      );
     }
-    return points;
-  }, [mean, stdDev]);
-
-  if (data.length === 0) return null;
+    return null;
+  };
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <ComposedChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+      <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
         <defs>
-          <linearGradient id="colorCurve" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+          <linearGradient id="colorProb" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4}/>
             <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+        
         <XAxis 
-          dataKey="x" 
-          type="number" 
-          domain={['auto', 'auto']} 
-          tickFormatter={(val) => val.toFixed(0) + 'm'}
-          stroke="#94a3b8" 
-          tick={{ fill: '#94a3b8', fontSize: 12 }}
+            dataKey="x" 
+            tick={{ fill: '#64748b', fontSize: 10 }} 
+            axisLine={false}
+            tickLine={false}
+            interval={10}
         />
-        <YAxis hide={true} />
-        <Tooltip 
-          contentStyle={{ backgroundColor: '#1e293b', borderColor: '#475569', color: '#f1f5f9' }}
-          itemStyle={{ color: '#818cf8' }}
-          labelFormatter={(label) => `Duração: ${Number(label).toFixed(1)} min`}
-          formatter={(value: number) => [value.toFixed(4), 'Probabilidade']}
+        <YAxis hide />
+        <Tooltip content={<CustomTooltip />} />
+        
+        <Area 
+            type="monotone" 
+            dataKey="y" 
+            stroke="#6366f1" 
+            strokeWidth={3}
+            fill="url(#colorProb)" 
+            animationDuration={1500}
         />
-        <Area type="monotone" dataKey="y" stroke="none" fill="url(#colorCurve)" />
-        <Line type="monotone" dataKey="y" stroke="#6366f1" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
-        <ReferenceLine x={mean} stroke="#10b981" strokeDasharray="3 3" label={{ position: 'top', value: 'Média', fill: '#10b981', fontSize: 12 }} />
-        {targetTime && (
-          <ReferenceLine x={targetTime} stroke="#ef4444" label={{ position: 'top', value: 'Limite', fill: '#ef4444', fontSize: 12 }} />
-        )}
-      </ComposedChart>
+        
+        {/* Linha da Média */}
+        <ReferenceLine x={mean} stroke="#94a3b8" strokeDasharray="3 3">
+           <text x={mean} y={10} fill="#94a3b8" fontSize={10} textAnchor="middle">Média</text>
+        </ReferenceLine>
+
+        {/* Linha do Alvo (Simulação) */}
+        <ReferenceLine x={targetTime} stroke="#f87171" strokeDasharray="3 3" />
+      </AreaChart>
     </ResponsiveContainer>
   );
 };

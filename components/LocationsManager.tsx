@@ -1,100 +1,106 @@
-// src/components/LocationsManager.tsx
-
 import React, { useState } from 'react';
-import { useLocations } from '../services/useLocations'; // <-- Importa o hook
+import { TrashIcon, PlusIcon, MapPinIcon } from './Icons';
 
-// Um ícone simples para o lixo (você já tem seu arquivo icons.tsx)
-const TrashIcon = () => (
-  <svg /* ... */ fill="currentColor" viewBox="0 0 20 20">
-    <path
-      fillRule="evenodd"
-      d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 6h6v10H7V6z"
-      clipRule="evenodd"
-    />
-  </svg>
-);
+interface LocationsManagerProps {
+  locations: any[]; 
+  addLocation: (name: string, color: string) => Promise<void>;
+  deleteLocation: (id: string) => Promise<void>;
+}
 
-export const LocationsManager: React.FC = () => {
-  const { locations, loading, addLocation, deleteLocation } = useLocations();
-  const [name, setName] = useState('');
-  const [color, setColor] = useState('#4287f5'); // Cor padrão
+const LocationsManager: React.FC<LocationsManagerProps> = ({ 
+  locations = [], 
+  addLocation, 
+  deleteLocation 
+}) => {
+  const [newLocation, setNewLocation] = useState('');
+  const [newColor, setNewColor] = useState('#3b82f6');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim() === '') return;
-    addLocation(name, color);
-    setName('');
-    setColor('#4287f5');
+    if (!newLocation.trim()) return;
+
+    setIsSubmitting(true);
+    try {
+      await addLocation(newLocation, newColor);
+      setNewLocation('');
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao adicionar local.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="bg-slate-800 p-6 rounded-lg shadow-lg">
-      <h2 className="text-2xl font-bold text-white mb-4">Gerenciar Locais</h2>
+    <div className="bg-slate-800 p-6 rounded-lg border border-slate-700 shadow-lg">
+      <div className="flex items-center gap-2 mb-4 text-slate-100">
+        <MapPinIcon className="w-6 h-6 text-indigo-400" />
+        <h2 className="text-xl font-bold">Gerenciar Locais</h2>
+      </div>
 
-      {/* --- Formulário de Adição --- */}
-      <form onSubmit={handleSubmit} className="flex gap-4 mb-6 items-end">
-        <div>
-          <label htmlFor="locationName" className="block text-sm font-medium text-slate-300">
-            Nome do Local
-          </label>
+      <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 items-end mb-6">
+        <div className="w-full sm:flex-1 space-y-1">
+          <label className="text-xs text-slate-400 font-bold uppercase">Nome do Local</label>
           <input
-            id="locationName"
             type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={newLocation}
+            onChange={(e) => setNewLocation(e.target.value)}
             placeholder="Ex: Hospital Central"
-            className="mt-1 block w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full bg-slate-900 border border-slate-600 rounded-md p-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
           />
         </div>
-        <div>
-          <label htmlFor="locationColor" className="block text-sm font-medium text-slate-300">
-            Cor
-          </label>
-          <input
-            id="locationColor"
-            type="color"
-            value={color}
-            onChange={(e) => setColor(e.target.value)}
-            className="mt-1 w-20 h-10 p-1 bg-slate-700 border border-slate-600 rounded-md cursor-pointer"
-          />
+        
+        <div className="space-y-1">
+          <label className="text-xs text-slate-400 font-bold uppercase">Cor</label>
+          <div className="flex items-center bg-slate-900 border border-slate-600 rounded-md px-1 h-[42px]">
+             <input
+              type="color"
+              value={newColor}
+              onChange={(e) => setNewColor(e.target.value)}
+              className="h-8 w-12 bg-transparent cursor-pointer border-none outline-none"
+            />
+          </div>
         </div>
+
         <button
           type="submit"
-          className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75"
+          disabled={isSubmitting || !newLocation}
+          className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold py-2.5 px-4 rounded-md transition-colors flex items-center justify-center gap-2 h-[42px]"
         >
-          Adicionar
+          {isSubmitting ? '...' : <><PlusIcon className="w-5 h-5" /> Adicionar</>}
         </button>
       </form>
 
-      {/* --- Lista de Locais --- */}
-      <div className="space-y-3">
-        {loading && <p className="text-slate-400">Carregando locais...</p>}
-        {!loading && locations.length === 0 && (
-          <p className="text-slate-400">Nenhum local cadastrado ainda.</p>
-        )}
-        {locations.map((loc) => (
-          <div
-            key={loc.id}
-            className="flex items-center justify-between bg-slate-700 p-3 rounded-lg"
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="w-5 h-5 rounded-full border-2 border-slate-400"
-                style={{ backgroundColor: loc.color }}
-              />
-              <span className="text-white font-medium">{loc.name}</span>
-            </div>
-            <button
-              onClick={() => deleteLocation(loc.id)}
-              className="text-slate-400 hover:text-red-500"
+      <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-1">
+        {locations.length === 0 ? (
+          <p className="text-slate-500 text-sm italic py-2">Nenhum local cadastrado.</p>
+        ) : (
+          locations.map((loc) => (
+            <div 
+              key={loc.id} 
+              className="flex items-center justify-between p-3 bg-slate-750 border border-slate-700 rounded hover:bg-slate-700 transition-colors"
             >
-              <TrashIcon />
-            </button>
-            {/* Nota: O botão de Update foi omitido por simplicidade do MVP, 
-                mas pode ser adicionado facilmente. */}
-          </div>
-        ))}
+              <div className="flex items-center gap-3">
+                <span 
+                  className="w-3 h-3 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)]" 
+                  style={{ backgroundColor: loc.color }}
+                />
+                <span className="text-slate-200">{loc.name}</span>
+              </div>
+              <button
+                onClick={() => { if(window.confirm('Excluir este local?')) deleteLocation(loc.id); }}
+                className="text-slate-500 hover:text-red-400 p-1"
+              >
+                <TrashIcon className="w-4 h-4" />
+              </button>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
 };
+
+// ESTA LINHA ABAIXO É O QUE FALTAVA PARA CORRIGIR O ERRO DA TELA BRANCA
+export default LocationsManager;

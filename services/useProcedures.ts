@@ -1,104 +1,81 @@
-// src/services/useProcedures.ts
-
 import { useState, useEffect } from 'react';
-import {
-  collection,
-  query,
-  onSnapshot,
-  addDoc,
-  deleteDoc,
-  doc,
-  Timestamp,
-  CollectionReference,
+import { 
+  collection, 
+  query, 
+  onSnapshot, 
+  addDoc, 
+  deleteDoc, 
+  doc, 
+  Timestamp 
 } from 'firebase/firestore';
-import { useAuth } from './useAuth';
-import { db } from './firebaseConfig';
 
-// 1. Seu tipo 'Procedure'. Ajuste os campos conforme o seu 'types.ts'
-// Eu vi 'name', 'startTime', 'endTime' no seu vídeo.
+// CORREÇÃO AQUI: O ponto único (.) busca na mesma pasta
+import { db } from './firebaseConfig'; 
+import { User } from 'firebase/auth';
+
 export interface Procedure {
   id: string;
   name: string;
-  startTime: string; // Ou Timestamp, dependendo de como você salvou
-  endTime: string;
-  duration: number; // Vi isso no seu App.tsx
-  // ... outros campos que você já usa ...
-  userId: string;
+  startTime: string; // HH:MM
+  endTime: string;   // HH:MM
+  duration: number;  // minutos
 }
 
-// 2. O hook agora recebe o 'shiftId' como argumento
-export const useProcedures = (shiftId: string | null) => {
+export function useProcedures(user: User | null, shiftId: string | null) {
   const [procedures, setProcedures] = useState<Procedure[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
 
+  // Ler Procedimentos em Tempo Real
   useEffect(() => {
-    // Não busca nada se o usuário não estiver logado ou se nenhum plantão (shift) for selecionado
     if (!user || !shiftId) {
       setProcedures([]);
-      setLoading(false);
       return;
     }
 
     setLoading(true);
+    // Caminho: users -> uid -> shifts -> shiftId -> procedures
+    const proceduresRef = collection(db, 'users', user.uid, 'shifts', shiftId, 'procedures');
+    const q = query(proceduresRef);
 
-    // 3. A MÁGICA: A consulta agora é na sub-coleção
-    // /users/{userID}/shifts/{shiftId}/procedures
-    const proceduresColRef = collection(
-      db,
-      'users',
-      user.uid,
-      'shifts',
-      shiftId,
-      'procedures'
-    ) as CollectionReference<Omit<Procedure, 'id'>>;
-
-    const q = query(proceduresColRef);
-
-    const unsubscribe = onSnapshot(
-      q,
-      (querySnapshot) => {
-        const shiftProcedures: Procedure[] = [];
-        querySnapshot.forEach((doc) => {
-          shiftProcedures.push({ id: doc.id, ...doc.data() });
-        });
-        setProcedures(shiftProcedures);
-        setLoading(false);
-      },
-      (error) => {
-        console.error('Erro ao buscar procedimentos: ', error);
-        setLoading(false);
-      }
-    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const loadedParams = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Procedure[];
+      
+      setProcedures(loadedParams);
+      setLoading(false);
+    });
 
     return () => unsubscribe();
-  }, [user, shiftId]); // <-- Re-executa se o usuário ou o shiftId mudar
+  }, [user, shiftId]);
 
-  // --- Funções de CRUD ---
-
-  // O addProcedure agora só precisa dos dados do procedimento
-  const addProcedure = async (procedureData: Omit<Procedure, 'id' | 'userId'>) => {
+  // Adicionar Procedimento
+  const addProcedure = async (name: string, start: string, end: string) => {
     if (!user || !shiftId) return;
 
-    const proceduresColRef = collection(
-      db, 'users', user.uid, 'shifts', shiftId, 'procedures'
-    );
-    
-    await addDoc(proceduresColRef, {
-      ...procedureData,
-      userId: user.uid,
-      shiftId: shiftId, // Opcional, mas bom para referência
+    // Calcular duração em minutos
+    const [h1, m1] = start.split(':').map(Number);
+    const [h2, m2] = end.split(':').map(Number);
+    const startMins = h1 * 60 + m1;
+    const endMins = h2 * 60 + m2;
+    let diff = endMins - startMins;
+    if (diff < 0) diff += 24 * 60; // Ajuste para virada de dia
+
+    await addDoc(collection(db, 'users', user.uid, 'shifts', shiftId, 'procedures'), {
+      name,
+      startTime: start,
+      endTime: end,
+      duration: diff,
+      createdAt: Timestamp.now()
     });
   };
 
-  const deleteProcedure = async (id: string) => {
+  // Deletar Procedimento
+  const deleteProcedure = async (procId: string) => {
     if (!user || !shiftId) return;
-
-    const procedureDocRef = doc(
-      db, 'users', user.uid, 'shifts', shiftId, 'procedures', id
-    );
-    await deleteDoc(procedureDocRef);
+    await deleteDoc(doc(db, 'users', user.uid, 'shifts', shiftId, 'procedures', procId));
   };
 
   return { procedures, loading, addProcedure, deleteProcedure };
-};
+}

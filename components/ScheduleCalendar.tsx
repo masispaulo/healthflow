@@ -1,250 +1,215 @@
-// src/components/ScheduleCalendar.tsx
-// VERSÃO FINAL E PADRONIZADA (DARK MODE)
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useShifts } from '../services/useShifts';
-import { useLocations } from '../services/useLocations';
-import { useProcedures } from '../services/useProcedures';
-
-// Componentes
-import ProcedureInputForm from './ProcedureInputForm';
-import ProcedureTable from './ProcedureTable';
-
-// Interfaces
-interface ProcedureFormData {
-  name: string;
-  startTime: string;
-  endTime: string;
-  duration: number;
-}
-
-interface ProcedureData {
-  id: string;
-  name: string;
-  startTime: string;
-  endTime: string;
-  duration: number;
-}
-
-const formatDate = (date: Date) => {
-  if (!date || isNaN(date.getTime())) return 'Data inválida';
-  return date.toLocaleString('pt-BR', {
-    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
-  });
-};
+import { User } from 'firebase/auth';
+import { TrashIcon, PlusIcon, CalendarIcon, ClockIcon, MapPinIcon } from './Icons';
 
 interface ScheduleCalendarProps {
+  user: User | null;
+  locations: any[]; 
   selectedShiftId: string | null;
-  onShiftSelected: (id: string | null) => void;
+  onSelectShift: (id: string | null) => void;
+  preSelectedDate?: Date | null;
 }
 
-export const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
-  selectedShiftId,
-  onShiftSelected,
+const formatDateForInput = (date: Date) => {
+  if (!date || isNaN(date.getTime())) return '';
+  const pad = (n: number) => n < 10 ? `0${n}` : n;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ 
+  user, 
+  locations = [], 
+  selectedShiftId, 
+  onSelectShift,
+  preSelectedDate 
 }) => {
-  const { shifts, loading: loadingShifts, addShift, deleteShift } = useShifts();
-  const { locations, loading: loadingLocations } = useLocations();
+  
+  const { shifts, addShift, updateShift, deleteShift, loading } = useShifts(user);
 
   const [title, setTitle] = useState('');
   const [locationId, setLocationId] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
-  const [error, setError] = useState('');
+  const [startStr, setStartStr] = useState('');
+  const [endStr, setEndStr] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const {
-    procedures,
-    loading: loadingProcedures,
-    addProcedure,
-    deleteProcedure,
-  } = useProcedures(selectedShiftId);
+  useEffect(() => {
+    if (selectedShiftId && shifts.length > 0) {
+      const shiftToEdit = shifts.find(s => s.id === selectedShiftId);
+      if (shiftToEdit) {
+        setTitle(shiftToEdit.title);
+        setLocationId(shiftToEdit.locationId);
+        setStartStr(formatDateForInput(shiftToEdit.startTime));
+        setEndStr(formatDateForInput(shiftToEdit.endTime));
+      }
+    } else {
+      if (!selectedShiftId) {
+          setTitle('');
+          // Define datas padrão se estiver vazio
+          const baseDate = preSelectedDate || new Date();
+          const startDate = new Date(baseDate);
+          startDate.setMinutes(0);
+          const endDate = new Date(startDate);
+          endDate.setHours(endDate.getHours() + 12);
 
-  const handleSubmitShift = (e: React.FormEvent) => {
+          setStartStr(formatDateForInput(startDate));
+          setEndStr(formatDateForInput(endDate));
+      }
+    }
+  }, [selectedShiftId, preSelectedDate, shifts]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError(null);
+    setIsSubmitting(true);
 
-    if (!title || !locationId || !startTime || !endTime) {
-      setError('Preencha todos os campos.');
+    if (!title || !locationId || !startStr || !endStr) {
+      setError("Por favor, preencha todos os campos.");
+      setIsSubmitting(false);
       return;
     }
-    const startDate = new Date(startTime);
-    const endDate = new Date(endTime);
+
+    const startDate = new Date(startStr);
+    const endDate = new Date(endStr);
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        setError("Datas inválidas. Verifique os campos de início e fim.");
+        setIsSubmitting(false);
+        return;
+    }
 
     if (endDate <= startDate) {
-      setError('Data final deve ser após a inicial.');
+      setError("A data final deve ser posterior à data inicial.");
+      setIsSubmitting(false);
       return;
     }
 
-    addShift(title, locationId, startDate, endDate);
-    // Limpa o formulário após adicionar com sucesso
-    setTitle('');
-    setLocationId('');
-    setStartTime('');
-    setEndTime('');
+    try {
+      if (selectedShiftId) {
+        await updateShift(selectedShiftId, {
+          title, locationId, startTime: startDate, endTime: endDate
+        });
+        alert("Escala atualizada!");
+        onSelectShift(null); 
+      } else {
+        await addShift({
+          title, locationId, startTime: startDate, endTime: endDate
+        });
+        setTitle('');
+        alert("Plantão criado com sucesso!");
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError("Erro ao salvar: " + (err.message || "Erro desconhecido"));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleAddProcedure = (proc: ProcedureFormData) => {
-    if (!selectedShiftId) return;
-    addProcedure(proc as any);
-  };
-
-  const handleDeleteProcedure = (id: string) => {
-    deleteProcedure(id);
-  };
-
-  const getLocationColor = (id: string) => {
-    const loc = locations.find((l) => l.id === id);
-    return loc ? loc.color : '#888';
+  const handleDelete = async () => {
+    if (!selectedShiftId || !window.confirm("Excluir esta escala?")) return;
+    try {
+      await deleteShift(selectedShiftId);
+      onSelectShift(null);
+    } catch (err) { alert("Erro ao excluir."); }
   };
 
   return (
-    <div className="space-y-8">
-      {/* === BLOCO 1: ADICIONAR PLANTÃO === */}
-      <div className="bg-slate-800 p-6 rounded-lg shadow-lg border border-slate-700">
-        <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-          📅 Minhas Escalas
+    <div className="bg-slate-800 p-6 rounded-lg border border-slate-700 shadow-lg">
+      <div className="flex items-center gap-2 mb-6 text-slate-100">
+        <CalendarIcon className="w-6 h-6 text-indigo-400" />
+        <h2 className="text-xl font-bold">
+          {selectedShiftId ? 'Editar Escala' : 'Nova Escala de Plantão'}
         </h2>
-
-        <form onSubmit={handleSubmitShift} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="md:col-span-2">
-            <label className="block text-sm text-slate-400 mb-1">Título do Plantão</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ex: Plantão UTI Noturno"
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-md text-white placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            />
-          </div>
-          
-          <div>
-             <label className="block text-sm text-slate-400 mb-1">Local</label>
-             <select
-              value={locationId}
-              onChange={(e) => setLocationId(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-md text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            >
-              <option value="">Selecione o Local...</option>
-              {locations.map((loc) => (
-                <option key={loc.id} value={loc.id}>{loc.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-                <label className="block text-sm text-slate-400 mb-1">Início</label>
-                <input
-                type="datetime-local"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="w-full px-2 py-2 bg-slate-900 border border-slate-600 rounded-md text-white focus:ring-2 focus:ring-blue-500 focus:outline-none [color-scheme:dark]"
-                />
-            </div>
-            <div>
-                <label className="block text-sm text-slate-400 mb-1">Fim</label>
-                <input
-                type="datetime-local"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className="w-full px-2 py-2 bg-slate-900 border border-slate-600 rounded-md text-white focus:ring-2 focus:ring-blue-500 focus:outline-none [color-scheme:dark]"
-                />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            className="md:col-span-2 w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-all shadow-md"
-          >
-            + Criar Plantão
-          </button>
-          {error && <p className="text-red-400 text-sm md:col-span-2">{error}</p>}
-        </form>
-
-        {/* LISTA DE PLANTÕES */}
-        <div className="mt-6 space-y-3">
-           <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Próximos Plantões</h3>
-           {loadingShifts ? <p className="text-slate-500 text-center">Carregando...</p> : null}
-           
-           {shifts.length === 0 && !loadingShifts && (
-             <p className="text-slate-500 text-center italic text-sm py-4">Nenhum plantão agendado.</p>
-           )}
-
-           {shifts
-            .sort((a, b) => a.start.toDate().getTime() - b.start.toDate().getTime())
-            .map((shift) => (
-              <div
-                key={shift.id}
-                onClick={() => onShiftSelected(shift.id)}
-                className={`relative p-4 rounded-lg border transition-all cursor-pointer group ${
-                  selectedShiftId === shift.id 
-                    ? 'bg-slate-700 border-blue-500 ring-1 ring-blue-500 shadow-lg' 
-                    : 'bg-slate-800 border-slate-700 hover:bg-slate-750 hover:border-slate-600'
-                }`}
-              >
-                {/* Barra Colorida Lateral */}
-                <div 
-                    className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-lg"
-                    style={{ backgroundColor: getLocationColor(shift.locationId) }}
-                />
-                
-                <div className="pl-3 flex justify-between items-start">
-                    <div>
-                        <h4 className="font-bold text-white text-lg">{shift.title}</h4>
-                        <p className="text-xs text-slate-400 mt-1">
-                            {formatDate(shift.start.toDate())} até {formatDate(shift.end.toDate())}
-                        </p>
-                    </div>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if(window.confirm('Tem certeza que deseja excluir este plantão?')) {
-                                deleteShift(shift.id);
-                                if (selectedShiftId === shift.id) onShiftSelected(null);
-                            }
-                        }}
-                        className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors"
-                        title="Excluir"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                    </button>
-                </div>
-              </div>
-            ))}
-        </div>
       </div>
 
-      {/* === BLOCO 2: PROCEDIMENTOS (CONDICIONAL) === */}
-      {selectedShiftId && (
-        <div className="bg-slate-800 p-6 rounded-lg shadow-xl border-t-4 border-blue-500 animation-fade-in">
-          <div className="flex justify-between items-center mb-6">
-             <h3 className="text-xl font-bold text-white">
-               📋 Procedimentos do Plantão
-             </h3>
-             <span className="text-xs bg-blue-900 text-blue-200 px-2 py-1 rounded border border-blue-700">
-                Plantão Selecionado
-             </span>
-          </div>
-          
-          {/* Formulário corrigido (Dark Mode) */}
-          <ProcedureInputForm onAddProcedure={handleAddProcedure} />
+      <form onSubmit={handleSubmit} className="space-y-4">
+        
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-slate-300">Título</label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Ex: Plantão UTI"
+            className="w-full bg-slate-900 border border-slate-600 rounded-md p-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+          />
+        </div>
 
-          {loadingProcedures ? (
-             <div className="flex justify-center py-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-             </div>
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-slate-300 flex items-center gap-1">
+            <MapPinIcon className="w-4 h-4" /> Local
+          </label>
+          <select
+            value={locationId}
+            onChange={(e) => setLocationId(e.target.value)}
+            className="w-full bg-slate-900 border border-slate-600 rounded-md p-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+          >
+            <option value="" disabled>Selecione...</option>
+            {locations && locations.length > 0 ? (
+              locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)
+            ) : (
+              <option disabled>Cadastre um local primeiro</option>
+            )}
+          </select>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-slate-300">Início</label>
+            <input type="datetime-local" value={startStr} onChange={(e) => setStartStr(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-md p-2 text-white outline-none" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-slate-300">Fim</label>
+            <input type="datetime-local" value={endStr} onChange={(e) => setEndStr(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-md p-2 text-white outline-none" />
+          </div>
+        </div>
+
+        {error && <div className="p-3 bg-red-900/50 border border-red-800 rounded text-red-200 text-sm">{error}</div>}
+
+        <div className="flex gap-3 pt-4">
+          {selectedShiftId ? (
+            <>
+              <button type="button" onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white p-2 rounded flex justify-center"><TrashIcon className="w-5 h-5"/></button>
+              <button type="button" onClick={() => onSelectShift(null)} className="flex-1 bg-slate-600 hover:bg-slate-500 text-white p-2 rounded">Cancelar</button>
+              <button type="submit" disabled={isSubmitting} className="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded">Salvar</button>
+            </>
           ) : (
-            <div className="mt-4">
-                <ProcedureTable
-                procedures={procedures as ProcedureData[]}
-                onDeleteProcedure={handleDeleteProcedure}
-                onClearProcedures={() => procedures.forEach(p => handleDeleteProcedure(p.id))}
-                />
-            </div>
+            <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded shadow-lg flex items-center justify-center gap-2">
+              <PlusIcon className="w-5 h-5" /> Criar Plantão
+            </button>
           )}
         </div>
-      )}
+      </form>
+
+      <div className="mt-8 border-t border-slate-700 pt-4">
+        <h3 className="text-slate-400 text-xs uppercase mb-3">Plantões Agendados</h3>
+        <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+          {loading ? <p className="text-slate-500 text-sm">Carregando...</p> : 
+           shifts.length === 0 ? <p className="text-slate-500 text-sm italic">Nenhum plantão.</p> : (
+            shifts
+              .sort((a, b) => (a.startTime?.getTime() || 0) - (b.startTime?.getTime() || 0)) // Proteção contra erro getTime
+              .map(shift => {
+                const locName = locations?.find(l => l.id === shift.locationId)?.name || 'Local desconhecido';
+                return (
+                  <div key={shift.id} onClick={() => onSelectShift(shift.id)} className="bg-slate-750 hover:bg-slate-700 border border-slate-700 p-3 rounded cursor-pointer transition-colors flex justify-between items-center">
+                    <div>
+                      <div className="font-bold text-slate-200">{shift.title}</div>
+                      <div className="text-xs text-slate-400">
+                        {shift.startTime ? shift.startTime.toLocaleDateString() : 'Data inválida'} • 
+                        {shift.startTime ? shift.startTime.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--:--'}
+                      </div>
+                      <div className="text-xs text-indigo-400 mt-1">{locName}</div>
+                    </div>
+                    <span className="text-xs bg-slate-800 px-2 py-1 rounded border border-slate-600 text-slate-400">Editar</span>
+                  </div>
+              )})
+          )}
+        </div>
+      </div>
     </div>
   );
 };
+
+export default ScheduleCalendar;
