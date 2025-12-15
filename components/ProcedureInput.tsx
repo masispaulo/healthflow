@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useProcedures } from '../services/useProcedures';
 import { useAuth } from '../services/useAuth'; 
-import { TrashIcon, PlusIcon, ClockIcon } from './Icons';
+import { TrashIcon, PlusIcon, ClockIcon } from './icons';
 
 interface ProcedureInputProps {
   shiftId: string;
