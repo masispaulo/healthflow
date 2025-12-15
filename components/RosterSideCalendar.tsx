@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User } from 'firebase/auth';
 import { useShifts } from '../services/useShifts';
-import { XMarkIcon } from './Icons'; 
+import { XMarkIcon } from './icons'; 
 
 interface RosterSideCalendarProps {
   user: User | null;
