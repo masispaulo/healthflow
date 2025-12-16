@@ -5,6 +5,7 @@ import ScheduleCalendar from './components/ScheduleCalendar';
 import RosterSideCalendar from './components/RosterSideCalendar';
 import ProcedureInput from './components/ProcedureInput'; 
 import AnalysisDashboard from './components/AnalysisDashboard';
+import TransferModal from './components/TransferModal'; // <--- O novo Modal de Transferência
 
 import { useAuth } from './services/useAuth';
 import { useLocations } from './services/useLocations';
@@ -16,40 +17,39 @@ const App: React.FC = () => {
   const { user, loginWithGoogle, logout, loading: authLoading } = useAuth();
   const { locations, addLocation, deleteLocation } = useLocations(user);
 
+  // Estados de Seleção
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
   const [preSelectedDate, setPreSelectedDate] = useState<Date | null>(null);
   
-  // Estados para a Análise
+  // Estado para o Modal de Transferência
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
+
+  // Estados de Dados (Análise e Procedimentos)
   const [analysisStats, setAnalysisStats] = useState<any>(null);
   const [formattedProcedures, setFormattedProcedures] = useState<any[]>([]);
   
-  // Gatilho para atualizar a tela assim que adicionar algo novo
+  // Gatilho para forçar atualização
   const [updateTrigger, setUpdateTrigger] = useState(0);
 
-  // --- FUNÇÃO QUE BUSCA E LIMPA OS DADOS DO BANCO ---
+  // --- BUSCA E FORMATAÇÃO DE DADOS ---
   const fetchAndFormatData = useCallback(async () => {
         if (!user) return;
         
         try {
-            // 1. Busca TODOS os plantões
             const shiftsRef = collection(db, 'users', user.uid, 'shifts');
             const shiftsSnap = await getDocs(shiftsRef);
             
             let durations: number[] = [];
             let proceduresList: any[] = [];
 
-            // Varre plantões e procedimentos
             const promises = shiftsSnap.docs.map(async (shiftDoc) => {
                 const pRef = collection(db, 'users', user.uid, 'shifts', shiftDoc.id, 'procedures');
                 const pSnap = await getDocs(pRef);
                 
                 pSnap.forEach(doc => {
                     const data = doc.data();
-                    
-                    // Converte duração para número
                     const duration = Number(data.duration);
                     
-                    // --- O PULO DO GATO ESTÁ AQUI ---
                     // Lê o TIPO (Work, Standby, Sleep). Se não tiver, assume WORK.
                     const type = data.type || 'WORK'; 
                     
@@ -58,13 +58,13 @@ const App: React.FC = () => {
                         durations.push(duration);
                     }
                     
-                    // 2. Para a Barra de Fadiga (Entra TUDO: Sono, Standby e Trabalho)
+                    // 2. Para a Barra de Fadiga (Entra TUDO)
                     if (data.startTime && data.endTime) {
                         proceduresList.push({ 
                             startTime: data.startTime, 
                             endTime: data.endTime,
                             duration: duration,
-                            type: type, // <--- Enviando o tipo para o Dashboard
+                            type: type, 
                             shiftId: shiftDoc.id,
                             name: data.name
                         });
@@ -74,21 +74,15 @@ const App: React.FC = () => {
 
             await Promise.all(promises);
 
-            // Calcula Estatísticas
             const stats = calculateGaussianStats(durations);
             setAnalysisStats(stats);
 
-            // Filtra procedimentos para o Dashboard de Fadiga
             let relevantProcedures = [];
             if (selectedShiftId) {
-                // Se tem plantão aberto, mostra só a fadiga DESSE plantão
                 relevantProcedures = proceduresList.filter(p => p.shiftId === selectedShiftId);
             } else {
-                // Se não, mostra a fadiga acumulada (opcional, aqui deixei mostrando tudo)
                 relevantProcedures = proceduresList; 
             }
-            
-            // ATUALIZA O DASHBOARD
             setFormattedProcedures(relevantProcedures);
 
         } catch (error) {
@@ -97,20 +91,11 @@ const App: React.FC = () => {
 
   }, [user, selectedShiftId, updateTrigger]); 
 
-  // Executa a busca ao carregar ou mudar algo
   useEffect(() => {
     fetchAndFormatData();
   }, [fetchAndFormatData]);
 
-  if (authLoading) return <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">Carregando...</div>;
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <button onClick={loginWithGoogle} className="bg-indigo-600 text-white px-6 py-3 rounded font-bold">Entrar com Google</button>
-      </div>
-    );
-  }
+  // --- HANDLERS ---
 
   const handleSelectShift = (id: string | null) => {
     setSelectedShiftId(id);
@@ -123,19 +108,47 @@ const App: React.FC = () => {
      window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Função chamada quando um novo procedimento é salvo
   const handleDataUpdate = () => {
-      setUpdateTrigger(prev => prev + 1); // Força o App a buscar os dados novos
+      setUpdateTrigger(prev => prev + 1); 
   };
 
+  // Quando o plantão é transferido com sucesso
+  const handleTransferSuccess = () => {
+      setSelectedShiftId(null); // Fecha o painel pois o plantão foi embora
+      setUpdateTrigger(prev => prev + 1); // Atualiza tudo
+  };
+
+  // --- RENDERIZAÇÃO ---
+
+  if (authLoading) return <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center font-bold animate-pulse">Carregando HealthFlow...</div>;
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="text-center space-y-6">
+            <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-600 mb-2">HealthFlow</h1>
+            <p className="text-slate-400">Gestão Inteligente de Escalas e Fadiga Médica</p>
+            <button onClick={loginWithGoogle} className="bg-white text-slate-900 px-8 py-3 rounded-full font-bold hover:bg-indigo-50 transition-colors shadow-lg flex items-center gap-2 mx-auto">
+                <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M21.35 11.1h-9.17v2.73h6.51c-.33 3.81-3.5 5.44-6.5 5.44C8.36 19.27 5 16.25 5 12c0-4.1 3.2-7.27 7.2-7.27 3.09 0 4.9 1.97 4.9 1.97L19 4.72S16.56 2 12.1 2C6.42 2 2.03 6.8 2.03 12c0 5.05 4.13 10 10.22 10 5.35 0 9.25-3.67 9.25-9.09 0-1.15-.15-1.81-.15-1.81z"/></svg>
+                Entrar com Google
+            </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 pb-20 font-sans">
+    <div className="min-h-screen bg-slate-900 text-slate-100 pb-20 font-sans selection:bg-indigo-500/30">
+      
+      {/* O Header agora tem Networking e Pacientes */}
       <Header user={user} onLogout={logout} />
 
       <main className="container mx-auto p-4 lg:p-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
-          <div className="lg:col-span-8 space-y-6">
+          {/* COLUNA ESQUERDA (Principal) */}
+          <div className="lg:col-span-8 space-y-8">
+            
             <LocationsManager locations={locations} addLocation={addLocation} deleteLocation={deleteLocation} />
             
             <ScheduleCalendar 
@@ -146,16 +159,40 @@ const App: React.FC = () => {
               preSelectedDate={preSelectedDate}
             />
 
-            {/* Input de Procedimentos (Só aparece se tiver plantão selecionado) */}
+            {/* ÁREA DE PROCEDIMENTOS (Só aparece se clicar num plantão) */}
             {selectedShiftId && (
-                <div id="procedures-area" className="pt-6 border-t border-slate-700">
-                    <h3 className="text-xl font-bold text-indigo-400 mb-4">Procedimentos do Plantão</h3>
-                    {/* Quando salvar aqui, chama handleDataUpdate para atualizar o Dashboard lá embaixo */}
+                <div id="procedures-area" className="pt-8 border-t border-slate-700 animate-fade-in">
+                    
+                    {/* Cabeçalho com Botão de Transferência */}
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+                        <h3 className="text-xl font-bold text-indigo-400 flex items-center gap-2">
+                            <span className="w-2 h-8 bg-indigo-500 rounded-full"></span>
+                            Procedimentos do Plantão
+                        </h3>
+                        
+                        <button 
+                            onClick={() => setIsTransferOpen(true)}
+                            className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-4 py-2 rounded-lg text-sm font-bold border border-slate-700 hover:border-indigo-500/50 transition-all shadow-sm"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                            Transferir Plantão
+                        </button>
+                    </div>
+
+                    {/* Input (Agora com Busca de Pacientes) */}
                     <ProcedureInput shiftId={selectedShiftId} onUpdate={handleDataUpdate} />
+                    
+                    {/* Modal de Transferência */}
+                    <TransferModal 
+                        isOpen={isTransferOpen} 
+                        onClose={() => setIsTransferOpen(false)} 
+                        shiftId={selectedShiftId}
+                        onSuccess={handleTransferSuccess}
+                    />
                 </div>
             )}
 
-            {/* DASHBOARD DE ANÁLISE E FADIGA */}
+            {/* DASHBOARD (Fadiga + Gauss) */}
             <div className="pt-8 mt-8 border-t border-slate-700">
                 <AnalysisDashboard 
                     analysis={analysisStats} 
@@ -165,10 +202,27 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <div className="lg:col-span-4 sticky top-4 z-10">
-             <div className="bg-slate-800 rounded-lg border border-slate-700 shadow-lg p-2">
-                <div className="p-2 mb-2 border-b border-slate-700"><h3 className="font-bold text-white">Minha Agenda</h3></div>
-                <RosterSideCalendar user={user} locations={locations} onDateSelect={handleDateSelectFromRoster} />
+          {/* COLUNA DIREITA (Lateral) */}
+          <div className="lg:col-span-4 sticky top-24 z-10 space-y-6">
+             {/* Card Agenda */}
+             <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-xl overflow-hidden">
+                <div className="p-4 border-b border-slate-700 bg-slate-800/50">
+                    <h3 className="font-bold text-white flex items-center gap-2">
+                        <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        Minha Agenda
+                    </h3>
+                </div>
+                <div className="p-2">
+                    <RosterSideCalendar user={user} locations={locations} onDateSelect={handleDateSelectFromRoster} />
+                </div>
+             </div>
+
+             {/* Dica Rápida (Opcional) */}
+             <div className="bg-indigo-900/20 border border-indigo-500/20 rounded-xl p-4">
+                <p className="text-xs text-indigo-300 font-bold mb-1">DICA PRO</p>
+                <p className="text-xs text-indigo-200/70">
+                    Adicione colegas no menu <strong>Networking</strong> para habilitar a troca rápida de plantões.
+                </p>
              </div>
           </div>
 
