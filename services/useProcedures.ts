@@ -1,81 +1,79 @@
 import { useState, useEffect } from 'react';
-import { 
-  collection, 
-  query, 
-  onSnapshot, 
-  addDoc, 
-  deleteDoc, 
-  doc, 
-  Timestamp 
-} from 'firebase/firestore';
-
-// CORREÇÃO AQUI: O ponto único (.) busca na mesma pasta
-import { db } from './firebaseConfig'; 
-import { User } from 'firebase/auth';
+import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { db } from './firebaseConfig';
 
 export interface Procedure {
   id: string;
   name: string;
-  startTime: string; // HH:MM
-  endTime: string;   // HH:MM
-  duration: number;  // minutos
+  startTime: string;
+  endTime: string;
+  duration: number;
+  type?: 'WORK' | 'STANDBY' | 'SLEEP'; // O tipo agora faz parte da interface
 }
 
-export function useProcedures(user: User | null, shiftId: string | null) {
+export const useProcedures = (user: any, shiftId: string | null) => {
   const [procedures, setProcedures] = useState<Procedure[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Ler Procedimentos em Tempo Real
   useEffect(() => {
     if (!user || !shiftId) {
       setProcedures([]);
+      setLoading(false);
       return;
     }
 
-    setLoading(true);
-    // Caminho: users -> uid -> shifts -> shiftId -> procedures
-    const proceduresRef = collection(db, 'users', user.uid, 'shifts', shiftId, 'procedures');
-    const q = query(proceduresRef);
+    const q = query(
+      collection(db, 'users', user.uid, 'shifts', shiftId, 'procedures'),
+      orderBy('startTime', 'asc')
+    );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const loadedParams = snapshot.docs.map(doc => ({
+      const procs = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Procedure[];
-      
-      setProcedures(loadedParams);
+      setProcedures(procs);
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, [user, shiftId]);
 
-  // Adicionar Procedimento
-  const addProcedure = async (name: string, start: string, end: string) => {
+  // AQUI ESTÁ A MUDANÇA: Aceita o 'type' (padrão é WORK)
+  const addProcedure = async (name: string, startTime: string, endTime: string, type: string = 'WORK') => {
     if (!user || !shiftId) return;
 
-    // Calcular duração em minutos
-    const [h1, m1] = start.split(':').map(Number);
-    const [h2, m2] = end.split(':').map(Number);
-    const startMins = h1 * 60 + m1;
-    const endMins = h2 * 60 + m2;
-    let diff = endMins - startMins;
-    if (diff < 0) diff += 24 * 60; // Ajuste para virada de dia
+    try {
+        const start = new Date(`2000-01-01T${startTime}`);
+        const end = new Date(`2000-01-01T${endTime}`);
+        
+        // Ajuste para virada de noite (ex: 23:00 as 02:00)
+        if (end < start) {
+            end.setDate(end.getDate() + 1);
+        }
 
-    await addDoc(collection(db, 'users', user.uid, 'shifts', shiftId, 'procedures'), {
-      name,
-      startTime: start,
-      endTime: end,
-      duration: diff,
-      createdAt: Timestamp.now()
-    });
+        const duration = Math.round((end.getTime() - start.getTime()) / 60000);
+
+        const newProc = {
+            name,
+            startTime,
+            endTime,
+            duration,
+            type, // SALVA NO BANCO SE É SLEEP, STANDBY OU WORK
+            createdAt: new Date()
+        };
+
+        await addDoc(collection(db, 'users', user.uid, 'shifts', shiftId, 'procedures'), newProc);
+    } catch (error) {
+        console.error("Erro ao adicionar procedimento:", error);
+        throw error;
+    }
   };
 
-  // Deletar Procedimento
-  const deleteProcedure = async (procId: string) => {
+  const deleteProcedure = async (id: string) => {
     if (!user || !shiftId) return;
-    await deleteDoc(doc(db, 'users', user.uid, 'shifts', shiftId, 'procedures', procId));
+    await deleteDoc(doc(db, 'users', user.uid, 'shifts', shiftId, 'procedures', id));
   };
 
-  return { procedures, loading, addProcedure, deleteProcedure };
-}
+  return { procedures, addProcedure, deleteProcedure, loading };
+};
