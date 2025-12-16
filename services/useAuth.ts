@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { auth, provider } from './firebaseConfig';
 import { 
   onAuthStateChanged, 
-  signInWithRedirect, // <--- Mudamos de Popup para Redirect
+  signInWithPopup, // <--- Voltamos para o Popup (o Rei da Aba Anônima)
   signOut, 
   User 
 } from 'firebase/auth';
@@ -12,24 +12,22 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Escuta a mudança de estado (Logado/Deslogado)
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, []);
 
-  // Função de Login (Agora redireciona a página inteira)
   const loginWithGoogle = async () => {
     try {
-      // Isso vai carregar a página do Google na mesma aba
-      // Funciona 100% em Mobile e Aba Anônima
-      await signInWithRedirect(auth, provider);
-    } catch (error) {
+      // Agora que as chaves estão certas (Hardcoded), 
+      // o Popup VAI abrir e ficar aberto até você logar.
+      await signInWithPopup(auth, provider);
+    } catch (error: any) {
       console.error("Erro no login:", error);
-      alert("Erro ao tentar conectar com Google.");
+      // Se der erro, avisa na tela
+      alert("Erro no login: " + error.message);
     }
   };
 
