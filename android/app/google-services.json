@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "781872196711",
+    "project_id": "healthflow-plataforma",
+    "storage_bucket": "healthflow-plataforma.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:781872196711:android:aaa4709038073e98a978c2",
+        "android_client_info": {
+          "package_name": "com.healthflow.plataforma"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "781872196711-hf67hmkq6poo35ri04ajv2gnhq8ceg56.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBLba6eoKuoy2npvQY3rYM7FcdMcaqKw-E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "781872196711-hf67hmkq6poo35ri04ajv2gnhq8ceg56.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
