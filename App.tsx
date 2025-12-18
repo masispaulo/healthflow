@@ -18,24 +18,22 @@ const App: React.FC = () => {
   const { locations, addLocation, deleteLocation } = useLocations(user);
 
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
-  const [preSelectedDate] = useState<Date | null>(null);
+  const [preSelectedDate, setPreSelectedDate] = useState<Date | null>(null);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
 
-  // Estados de Dados e Gatilhos
+  // === ESTADOS DE DADOS ===
   const [analysisStats, setAnalysisStats] = useState<any>(null);
   const [formattedProcedures, setFormattedProcedures] = useState<any[]>([]);
   const [updateTrigger, setUpdateTrigger] = useState(0);
 
-  // Estado Modal Descanso
+  // === ESTADOS DO MODAL DE SONO ===
   const [isSleepModalOpen, setIsSleepModalOpen] = useState(false);
   const [sleepStartHour, setSleepStartHour] = useState('');
   const [sleepStartMinute, setSleepStartMinute] = useState('');
   const [sleepEndHour, setSleepEndHour] = useState('');
   const [sleepEndMinute, setSleepEndMinute] = useState('');
 
-  // =========================
-  // 🧠 CÉREBRO: BUSCA E CALCULA ESTATÍSTICAS
-  // =========================
+  // 1. BUSCA INTELIGENTE
   const fetchAndFormatData = useCallback(async () => {
     if (!user) return;
     try {
@@ -75,7 +73,7 @@ const App: React.FC = () => {
       setFormattedProcedures(currentShiftProcedures);
 
     } catch (error) {
-      console.error("Erro ao carregar dados:", error);
+      console.error("Erro ao processar dados:", error);
     }
   }, [user, selectedShiftId, updateTrigger]);
 
@@ -87,7 +85,7 @@ const App: React.FC = () => {
       setUpdateTrigger(prev => prev + 1); 
   };
 
-  // ... (Funções de Intervalo e Sono mantidas iguais) ...
+  // 2. LÓGICA DE DETECÇÃO DE SONO E INTERVALO
   const detectIntervalBetweenShifts = async (currentShiftId: string) => {
     if (!user) return false;
     const shiftsRef = collection(db, 'users', user.uid, 'shifts');
@@ -118,6 +116,7 @@ const App: React.FC = () => {
     const end = new Date(`2000-01-01T${endTime}`);
     if (end < start) end.setDate(end.getDate() + 1);
     const duration = (end.getTime() - start.getTime()) / 60000;
+    
     await addDoc(collection(db, 'users', user.uid, 'shifts', shiftId, 'procedures'), {
       type: 'SLEEP', startTime, endTime, duration, name: 'Descanso'
     });
@@ -139,16 +138,16 @@ const App: React.FC = () => {
   const SleepModal = () => {
     if (!isSleepModalOpen) return null;
     return (
-      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm">
-        <div className="w-full bg-slate-800 border-t border-slate-700 rounded-t-2xl p-6 animate-slide-up shadow-xl">
+      <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+        <div className="w-full bg-slate-800 border-t border-slate-700 rounded-t-2xl p-6 animate-slide-up shadow-2xl">
           <h2 className="text-lg font-bold text-white mb-4">Registrar Descanso</h2>
           <div className="space-y-4">
-            <div><label className="text-sm text-slate-300">Início</label><div className="flex items-center gap-2 mt-1"><input type="number" placeholder="HH" value={sleepStartHour} onChange={(e) => setSleepStartHour(e.target.value)} className="w-16 bg-slate-700 text-white p-2 rounded-lg text-center" /><span className="text-white text-xl">:</span><input type="number" placeholder="MM" value={sleepStartMinute} onChange={(e) => setSleepStartMinute(e.target.value)} className="w-16 bg-slate-700 text-white p-2 rounded-lg text-center" /></div></div>
-            <div><label className="text-sm text-slate-300">Fim</label><div className="flex items-center gap-2 mt-1"><input type="number" placeholder="HH" value={sleepEndHour} onChange={(e) => setSleepEndHour(e.target.value)} className="w-16 bg-slate-700 text-white p-2 rounded-lg text-center" /><span className="text-white text-xl">:</span><input type="number" placeholder="MM" value={sleepEndMinute} onChange={(e) => setSleepEndMinute(e.target.value)} className="w-16 bg-slate-700 text-white p-2 rounded-lg text-center" /></div></div>
+            <div><label className="text-sm text-slate-300">Início</label><div className="flex items-center gap-2 mt-1"><input type="number" placeholder="HH" value={sleepStartHour} onChange={(e) => setSleepStartHour(e.target.value)} className="w-16 bg-slate-700 text-white p-3 rounded-lg text-center text-lg outline-none focus:ring-2 focus:ring-indigo-500" /><span className="text-white text-xl">:</span><input type="number" placeholder="MM" value={sleepStartMinute} onChange={(e) => setSleepStartMinute(e.target.value)} className="w-16 bg-slate-700 text-white p-3 rounded-lg text-center text-lg outline-none focus:ring-2 focus:ring-indigo-500" /></div></div>
+            <div><label className="text-sm text-slate-300">Fim</label><div className="flex items-center gap-2 mt-1"><input type="number" placeholder="HH" value={sleepEndHour} onChange={(e) => setSleepEndHour(e.target.value)} className="w-16 bg-slate-700 text-white p-3 rounded-lg text-center text-lg outline-none focus:ring-2 focus:ring-indigo-500" /><span className="text-white text-xl">:</span><input type="number" placeholder="MM" value={sleepEndMinute} onChange={(e) => setSleepEndMinute(e.target.value)} className="w-16 bg-slate-700 text-white p-3 rounded-lg text-center text-lg outline-none focus:ring-2 focus:ring-indigo-500" /></div></div>
           </div>
           <div className="mt-6 flex flex-col gap-3">
-            <button onClick={() => saveSleepProcedure(selectedShiftId!)} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl">Salvar Descanso</button>
-            <button onClick={() => setIsSleepModalOpen(false)} className="w-full bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-3 rounded-xl">Cancelar</button>
+            <button onClick={() => saveSleepProcedure(selectedShiftId!)} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-xl text-lg shadow-lg">Salvar Descanso</button>
+            <button onClick={() => setIsSleepModalOpen(false)} className="w-full bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-4 rounded-xl text-lg">Cancelar</button>
           </div>
         </div>
       </div>
@@ -156,18 +155,20 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white pb-20">
+    <div className="min-h-screen bg-slate-900 text-white pb-32">
       {user && <Header user={user} onLogout={logout} />}
 
       {!user ? (
         <div className="flex flex-col items-center justify-center h-[70vh]">
-          <button onClick={loginWithGoogle} className="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-xl font-bold">Entrar com Google</button>
+          <button onClick={loginWithGoogle} className="bg-indigo-600 hover:bg-indigo-500 px-8 py-4 rounded-xl font-bold text-lg shadow-xl transition-transform transform hover:scale-105">
+            Entrar com Google
+          </button>
         </div>
       ) : (
-        // ✅ LAYOUT DE COLUNAS RESTAURADO AQUI
-        <div className="container mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        // LAYOUT COM GAP MAIOR E SEM POSIÇÃO RELATIVA/ABSOLUTA PROBLEMÁTICA
+        <div className="container mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          {/* COLUNA PRINCIPAL (ESQUERDA - 8 colunas) */}
+          {/* === COLUNA DA ESQUERDA === */}
           <div className="lg:col-span-8 space-y-8">
             <LocationsManager 
                 locations={locations} 
@@ -183,52 +184,45 @@ const App: React.FC = () => {
                 selectedShiftId={selectedShiftId} 
             />
             
-            {/* ÁREA DE PROCEDIMENTOS (SÓ APARECE SELECIONADO) */}
             {selectedShiftId && (
-                <div id="procedures-area" className="pt-8 border-t border-slate-700">
+                <div id="procedures-area" className="pt-8 border-t border-slate-700 animate-fade-in">
                     <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-xl font-bold text-indigo-400">Procedimentos</h3>
-                        <button onClick={() => setIsTransferOpen(true)} className="text-sm bg-slate-800 p-2 rounded border border-slate-700">Transferir</button>
+                        <h3 className="text-xl font-bold text-indigo-400 flex items-center gap-2">⚡ Procedimentos</h3>
+                        <button onClick={() => setIsTransferOpen(true)} className="text-sm bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg border border-slate-600 transition-colors">Transferir Plantão</button>
                     </div>
-                    
-                    <ProcedureInput 
-                        shiftId={selectedShiftId} 
-                        onUpdate={handleDataUpdate} // Gatilho de atualização
-                    />
+                    <ProcedureInput shiftId={selectedShiftId} onUpdate={handleDataUpdate} />
                 </div>
             )}
 
-            {/* PAINEL DE ANÁLISE (ANTERIORMENTE NO FINAL) */}
             {analysisStats && (
-                <div className="pt-8 mt-8 border-t border-slate-700">
-                    <AnalysisDashboard 
-                        analysis={analysisStats} 
-                        procedures={formattedProcedures} 
-                    />
+                <div className="pt-8 mt-8 border-t border-slate-700 animate-fade-in">
+                    <AnalysisDashboard analysis={analysisStats} procedures={formattedProcedures} />
                 </div>
             )}
           </div>
 
-          {/* COLUNA LATERAL (DIREITA - 4 colunas - FIXA NO TOPO) */}
-          <div className="lg:col-span-4 sticky top-24 space-y-6">
-             <div className="bg-slate-800 rounded-2xl border border-slate-700 p-2 shadow-xl">
-                {/* O CALENDÁRIO FICOU AQUI NA LATERAL DE VOLTA */}
+          {/* === COLUNA DA DIREITA (CALENDÁRIO) === */}
+          {/* Removi o sticky para parar de flutuar e sobrepor */}
+          <div className="lg:col-span-4 space-y-6">
+             <div className="bg-slate-800 rounded-2xl border border-slate-700 p-1 shadow-xl overflow-hidden">
                 <RosterSideCalendar 
                     user={user} 
-                    selectedShiftId={selectedShiftId} // Adicionei para destacar o selecionado
-                    onSelectShift={handleSelectShift} 
+                    locations={locations} 
+                    onDateSelect={(date) => {
+                       setSelectedShiftId(null);
+                       setPreSelectedDate(date);
+                       if (window.innerWidth < 1024) {
+                         window.scrollTo({ top: 0, behavior: 'smooth' });
+                       }
+                    }}
                 />
              </div>
           </div>
+
         </div>
       )}
 
-      <TransferModal 
-        isOpen={isTransferOpen} 
-        onClose={() => setIsTransferOpen(false)} 
-        user={user} 
-        shiftId={selectedShiftId} 
-      />
+      <TransferModal isOpen={isTransferOpen} onClose={() => setIsTransferOpen(false)} user={user} shiftId={selectedShiftId} />
       <SleepModal />
     </div>
   );
