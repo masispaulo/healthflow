@@ -1,0 +1,24 @@
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from './firebaseConfig';
+
+export const saveUserToDirectory = async (user) => {
+  if (!user || !user.email) return;
+
+  try {
+    const directoryRef = doc(db, 'directory', user.email);
+
+    await setDoc(
+      directoryRef,
+      {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName || 'Médico',
+        photoURL: user.photoURL || '',
+        lastLogin: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  } catch (error) {
+    console.error('Erro ao salvar no diretório:', error);
+  }
+};

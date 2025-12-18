@@ -1,32 +1,41 @@
 import { useState, useEffect } from 'react';
 import { auth, provider } from './firebaseConfig';
-import { 
-  onAuthStateChanged, 
-  signInWithPopup, // <--- Voltamos para o Popup (o Rei da Aba Anônima)
-  signOut, 
-  User 
+import {
+  onAuthStateChanged,
+  signInWithPopup,
+  signOut,
+  User
 } from 'firebase/auth';
+
+import { saveUserToDirectory } from './saveUserToDirectory';
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       setLoading(false);
+
+      // ✅ Se logou, salva no diretório de médicos
+      if (currentUser) {
+        await saveUserToDirectory(currentUser);
+      }
     });
+
     return () => unsubscribe();
   }, []);
 
   const loginWithGoogle = async () => {
     try {
-      // Agora que as chaves estão certas (Hardcoded), 
-      // o Popup VAI abrir e ficar aberto até você logar.
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+
+      // ✅ Salva no diretório imediatamente após login
+      await saveUserToDirectory(result.user);
+
     } catch (error: any) {
       console.error("Erro no login:", error);
-      // Se der erro, avisa na tela
       alert("Erro no login: " + error.message);
     }
   };

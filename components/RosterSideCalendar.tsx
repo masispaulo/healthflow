@@ -50,7 +50,7 @@ const RosterSideCalendar: React.FC<RosterSideCalendarProps> = ({ user, locations
 
     // Dias do mês
     for (let i = 1; i <= totalDays; i++) {
-      const dayDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), i);
+      // const dayDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), i); // não usado no render, mas útil se precisasse
       
       const shiftsOnDay = shifts.filter(s => 
         s.startTime.getDate() === i && 
@@ -77,13 +77,30 @@ const RosterSideCalendar: React.FC<RosterSideCalendarProps> = ({ user, locations
             {/* Lista de Plantões no dia */}
             <div className="flex flex-col gap-1 overflow-y-auto max-h-[110px] custom-scrollbar">
               {shiftsOnDay.map(shift => (
-                <div key={shift.id} className="text-[10px] sm:text-xs bg-indigo-600/90 text-white p-1.5 rounded shadow-sm border-l-2 border-indigo-300 leading-tight">
+                <div 
+                  key={shift.id} 
+                  // ✅ LÓGICA DE COR DINÂMICA (Verde se transferido, ou cor do banco, ou Indigo padrão)
+                  style={{ backgroundColor: shift.color || '#4F46E5' }}
+                  className="text-[10px] sm:text-xs text-white p-1.5 rounded shadow-sm border-l-2 border-white/30 leading-tight relative group"
+                >
+                  {/* Ícone de estrela se foi transferido */}
+                  {shift.transferredFrom && (
+                     <span className="absolute top-0 right-1 text-[8px] text-yellow-300" title="Transferido">★</span>
+                  )}
+
                   <div className="font-bold">
                     {shift.startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                   </div>
                   <div className="opacity-90 line-clamp-2">
                     {getLocationName(shift.locationId)}
                   </div>
+
+                  {/* Mostra de quem veio (só o começo do email para não poluir) */}
+                  {shift.transferredFrom && (
+                      <div className="text-[9px] italic opacity-75 mt-0.5 truncate">
+                          De: {shift.transferredFrom.split('@')[0]}
+                      </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -92,6 +109,10 @@ const RosterSideCalendar: React.FC<RosterSideCalendarProps> = ({ user, locations
       } 
       // --- MODO MINI (LATERAL) ---
       else {
+        // Verifica se tem algum plantão verde (transferido) nesse dia para pintar a bolinha de verde
+        const hasTransferredShift = shiftsOnDay.some(s => s.transferredFrom);
+        const dayColorClass = hasTransferredShift ? 'bg-emerald-500 hover:bg-emerald-400' : 'bg-indigo-600 hover:bg-indigo-500';
+
         days.push(
           <button
             key={i}
@@ -99,12 +120,13 @@ const RosterSideCalendar: React.FC<RosterSideCalendarProps> = ({ user, locations
             className={`
               relative flex items-center justify-center rounded-full transition-all duration-200 h-8 w-8 text-xs
               ${hasShift 
-                ? 'bg-indigo-600 text-white font-bold shadow-lg shadow-indigo-500/50 hover:bg-indigo-500' 
+                ? `${dayColorClass} text-white font-bold shadow-lg` 
                 : 'text-slate-400 hover:bg-slate-700 hover:text-white'}
             `}
           >
             {i}
-            {hasShift && <span className="absolute bottom-0.5 w-1 h-1 bg-indigo-400 rounded-full"></span>}
+            {/* Bolinha indicadora pequena */}
+            {hasShift && <span className="absolute bottom-0.5 w-1 h-1 bg-white/50 rounded-full"></span>}
           </button>
         );
       }
