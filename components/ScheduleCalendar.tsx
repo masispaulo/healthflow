@@ -19,7 +19,7 @@ const formatDateForInput = (date: Date) => {
 
 const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ 
   user, 
-  locations = [], 
+  locations, // Removi o valor padrão [] para o "undefined" funcionar na verificação de carregamento
   selectedShiftId, 
   onSelectShift,
   preSelectedDate 
@@ -122,7 +122,6 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
         </h2>
       </div>
 
-      {/* Adicionei pb-32 para dar espaço para o botão fixo no final não cobrir os inputs */}
       <form onSubmit={handleSubmit} className="space-y-4 pb-32 md:pb-0 overflow-y-auto">
         
         <div className="space-y-1">
@@ -136,6 +135,7 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
           />
         </div>
 
+        {/* --- CORREÇÃO DO SELECT DE LOCAIS --- */}
         <div className="space-y-1">
           <label className="text-sm font-medium text-slate-300 flex items-center gap-1">
             <MapPinIcon className="w-4 h-4" /> Local
@@ -146,11 +146,19 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
             className="w-full bg-slate-900 border border-slate-600 rounded-md p-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
           >
             <option value="" disabled>Selecione...</option>
-            {locations && locations.length > 0 ? (
-              locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)
+            
+            {locations === undefined ? (
+              <option disabled>Carregando...</option>
+            ) : locations.length === 0 ? (
+              <option disabled>Nenhum local cadastrado</option>
             ) : (
-              <option disabled>Cadastre um local primeiro</option>
+              locations.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name}
+                </option>
+              ))
             )}
+            
           </select>
         </div>
 
@@ -167,8 +175,6 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
 
         {error && <div className="p-3 bg-red-900/50 border border-red-800 rounded text-red-200 text-sm">{error}</div>}
 
-        {/* --- AQUI ESTÁ A MÁGICA DO BOTÃO FIXO --- */}
-        {/* No Mobile: fixed bottom-0 (grudado embaixo). No Desktop: relative (normal) */}
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-slate-800 border-t border-slate-700 z-50 md:relative md:bg-transparent md:border-0 md:p-0 md:pt-4 flex gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.3)] md:shadow-none">
           {selectedShiftId ? (
             <>
@@ -184,29 +190,27 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
         </div>
       </form>
 
-      {/* Lista de plantões existentes abaixo do form (Escondido no mobile se o form for longo, aparece no scroll) */}
       <div className="mt-8 border-t border-slate-700 pt-4 hidden md:block">
         <h3 className="text-slate-400 text-xs uppercase mb-3">Seus Agendamentos</h3>
         <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
-          {/* ... (código da lista igual ao anterior) ... */}
            {loading ? <p className="text-slate-500 text-sm">Carregando...</p> : 
             shifts.length === 0 ? <p className="text-slate-500 text-sm italic">Nenhum plantão.</p> : (
-             shifts
-               .sort((a, b) => (a.startTime?.getTime() || 0) - (b.startTime?.getTime() || 0))
-               .map(shift => {
-                 const locName = locations?.find(l => l.id === shift.locationId)?.name || 'Local desconhecido';
-                 return (
-                   <div key={shift.id} onClick={() => onSelectShift(shift.id)} className="bg-slate-750 hover:bg-slate-700 border border-slate-700 p-3 rounded cursor-pointer transition-colors flex justify-between items-center">
-                     <div>
-                       <div className="font-bold text-slate-200">{shift.title}</div>
-                       <div className="text-xs text-slate-400">
-                         {shift.startTime ? shift.startTime.toLocaleDateString() : ''} • {locName}
-                       </div>
-                     </div>
-                     <span className="text-xs bg-slate-800 px-2 py-1 rounded border border-slate-600 text-slate-400">Editar</span>
-                   </div>
-               )})
-           )}
+              shifts
+                .sort((a, b) => (a.startTime?.getTime() || 0) - (b.startTime?.getTime() || 0))
+                .map(shift => {
+                  const locName = locations?.find(l => l.id === shift.locationId)?.name || 'Local desconhecido';
+                  return (
+                    <div key={shift.id} onClick={() => onSelectShift(shift.id)} className="bg-slate-750 hover:bg-slate-700 border border-slate-700 p-3 rounded cursor-pointer transition-colors flex justify-between items-center">
+                      <div>
+                        <div className="font-bold text-slate-200">{shift.title}</div>
+                        <div className="text-xs text-slate-400">
+                          {shift.startTime ? shift.startTime.toLocaleDateString() : ''} • {locName}
+                        </div>
+                      </div>
+                      <span className="text-xs bg-slate-800 px-2 py-1 rounded border border-slate-600 text-slate-400">Editar</span>
+                    </div>
+                )})
+            )}
         </div>
       </div>
     </div>

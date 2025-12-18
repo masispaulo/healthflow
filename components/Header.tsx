@@ -61,7 +61,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
             >
                 <div className="text-right hidden md:block">
                     <p className="text-sm font-bold text-white group-hover:text-indigo-300 transition-colors">
-                        {user.displayName?.split(' ')[0] || 'Doutor'}
+                    {user?.displayName?.split(' ')[0] || 'Doutor'}
                     </p>
                 </div>
                 {user.photoURL ? (

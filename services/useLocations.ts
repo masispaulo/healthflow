@@ -1,4 +1,4 @@
-    // src/hooks/useLocations.ts
+// src/hooks/useLocations.ts
 
 import { useState, useEffect } from 'react';
 import {
@@ -9,13 +9,11 @@ import {
   updateDoc,
   deleteDoc,
   doc,
-  where,
   CollectionReference,
 } from 'firebase/firestore';
-import { useAuth } from './useAuth'; // <-- Você precisará de um hook de autenticação
-import { db } from '../services/firebaseConfig'; // <-- Sua configuração do Firebase
+import { useAuth } from './useAuth';
+import { db } from '../services/firebaseConfig';
 
-// 1. Definir o tipo (Type) para um Local
 export interface Location {
   id: string;
   name: string;
@@ -23,11 +21,10 @@ export interface Location {
   userId: string;
 }
 
-// 2. Definir o hook
 export const useLocations = () => {
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth(); // <-- Pega o usuário logado
+  const { user } = useAuth();
 
   useEffect(() => {
     if (!user) {
@@ -38,8 +35,6 @@ export const useLocations = () => {
 
     setLoading(true);
 
-    // 3. Criar a consulta: /users/{userID}/locations
-    // Isso garante que o médico só veja os locais DELE
     const locationsColRef = collection(
       db,
       'users',
@@ -49,34 +44,30 @@ export const useLocations = () => {
 
     const q = query(locationsColRef);
 
-    // 4. Ligar o listener real-time (onSnapshot)
     const unsubscribe = onSnapshot(
       q,
-      (querySnapshot) => {
-        const userLocations: Location[] = [];
-        querySnapshot.forEach((doc) => {
-          userLocations.push({ id: doc.id, ...doc.data() });
-        });
-        setLocations(userLocations);
+      (snapshot) => {
+        const loaded: Location[] = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
+        setLocations(loaded);
         setLoading(false);
       },
       (error) => {
-        console.error('Erro ao buscar locais: ', error);
+        console.error('Erro ao buscar locais:', error);
         setLoading(false);
       }
     );
 
-    // 5. Limpar o listener ao desmontar
     return () => unsubscribe();
-  }, [user]); // <-- Re-executa se o usuário mudar
-
-  // --- Funções de CRUD ---
+  }, [user]);
 
   const addLocation = async (name: string, color: string) => {
     if (!user) return;
 
-    const locationsColRef = collection(db, 'users', user.uid, 'locations');
-    await addDoc(locationsColRef, {
+    await addDoc(collection(db, 'users', user.uid, 'locations'), {
       name,
       color,
       userId: user.uid,
@@ -86,8 +77,7 @@ export const useLocations = () => {
   const updateLocation = async (id: string, newName: string, newColor: string) => {
     if (!user) return;
 
-    const locationDocRef = doc(db, 'users', user.uid, 'locations', id);
-    await updateDoc(locationDocRef, {
+    await updateDoc(doc(db, 'users', user.uid, 'locations', id), {
       name: newName,
       color: newColor,
     });
@@ -96,14 +86,8 @@ export const useLocations = () => {
   const deleteLocation = async (id: string) => {
     if (!user) return;
 
-    const locationDocRef = doc(db, 'users', user.uid, 'locations', id);
-    await deleteDoc(locationDocRef);
+    await deleteDoc(doc(db, 'users', user.uid, 'locations', id));
   };
 
   return { locations, loading, addLocation, updateLocation, deleteLocation };
 };
-
-// --- NOTA ---
-// Você precisará criar um hook useAuth() simples que exponha o usuário logado
-// Ex: const auth = getAuth(); const [user, setUser] = useState(auth.currentUser);
-// ... e um listener onAuthStateChanged para atualizar esse estado.
