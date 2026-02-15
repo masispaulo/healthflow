@@ -4,33 +4,40 @@ interface BellCurveChartProps {
   mean: number;
   stdDev: number;
   targetTime: number;
+  elapsedTime?: number;
+  zerado?: boolean; // Curva zerada pelo médico
 }
 
-const BellCurveChart: React.FC<BellCurveChartProps> = ({ mean, stdDev, targetTime }) => {
+const BellCurveChart: React.FC<BellCurveChartProps> = ({ mean, stdDev, targetTime, elapsedTime = 0, zerado }) => {
   const [hoverX, setHoverX] = useState<number | null>(null);
 
-  // 1. PROTEÇÃO CONTRA DADOS ZERADOS
+  // Proteção contra dados zerados ou inválidos
   const safeMean = (!mean || isNaN(mean)) ? 0 : mean;
-  const visualStdDev = (!stdDev || stdDev <= 0 || isNaN(stdDev)) ? (safeMean * 0.2 || 1) : stdDev;
+  const visualStdDev = (!stdDev || stdDev <= 0 || isNaN(stdDev)) ? (safeMean > 0 ? safeMean * 0.2 : 10) : stdDev;
 
-  if (safeMean === 0 && (!mean || mean !== 0)) {
+  if (safeMean === 0 || zerado) {
      return (
-       <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800/30 rounded border border-dashed border-slate-700 text-slate-500 text-xs gap-2">
-          <span>Aguardando dados...</span>
-       </div>
+      <div className="flex flex-col items-center justify-center h-full rounded-2xl bg-gradient-to-b from-slate-800/50 to-slate-900/30 border border-slate-700/50 p-8 backdrop-blur-sm">
+        <div className="w-16 h-16 rounded-full bg-indigo-500/10 flex items-center justify-center mb-4">
+          <svg className="w-8 h-8 text-indigo-400/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+          </svg>
+        </div>
+        <span className="text-slate-400 font-medium">{zerado ? 'Curva zerada' : 'Aguardando dados do plantão...'}</span>
+        <span className="text-slate-600 text-xs mt-1">Adicione procedimentos para visualizar</span>
+      </div>
      );
   }
 
-  // 2. MATEMÁTICA DA CURVA (Centralização Perfeita)
-  // Abrimos 4 desvios para cada lado. A média fica EXATAMENTE no meio (50%).
-  const range = visualStdDev * 4; 
+  const range = visualStdDev * 4;
   const startX = safeMean - range;
   const endX = safeMean + range;
-  
+  const span = endX - startX;
+
   const points = [];
-  const steps = 120; // Mais suave
+  const steps = 120;
   for (let i = 0; i <= steps; i++) {
-    const x = startX + (i * (endX - startX)) / steps;
+    const x = startX + (i * span) / steps;
     const exponent = -0.5 * Math.pow((x - safeMean) / visualStdDev, 2);
     const y = (1 / (visualStdDev * Math.sqrt(2 * Math.PI))) * Math.exp(exponent);
     points.push({ x, y });
@@ -38,102 +45,84 @@ const BellCurveChart: React.FC<BellCurveChartProps> = ({ mean, stdDev, targetTim
 
   const maxY = Math.max(...points.map(p => p.y)) || 1;
 
-  // Conversão para Coordenadas SVG (0 a 100)
-  const getSvgX = (val: number) => ((val - startX) / (endX - startX)) * 100;
-  // Ajustamos o topo para 5 (quase tocando a borda) e base 95
-  const getSvgY = (val: number) => 95 - (val / maxY) * 90; 
+  const getSvgX = (val: number) => ((val - startX) / span) * 100;
+  const getSvgY = (val: number) => 95 - (val / maxY) * 85;
 
-  const pathD = points.map((p, i) => 
-    `${i === 0 ? 'M' : 'L'} ${getSvgX(p.x).toFixed(2)} ${getSvgY(p.y).toFixed(2)}`
-  ).join(' ');
-
-  const areaD = `${pathD} L 100 100 L 0 100 Z`; // Fecha a base
+  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${getSvgX(p.x).toFixed(2)} ${getSvgY(p.y).toFixed(2)}`).join(' ');
+  const areaD = `${pathD} L 100 100 L 0 100 Z`;
 
   const meanPos = getSvgX(safeMean);
-  
-  // 3. LÓGICA MAGNÉTICA DA LINHA VERMELHA 🧲
-  // Se a meta passar do limite do gráfico, ela gruda na borda (com 2% de margem)
-  let rawTargetPos = getSvgX(targetTime);
-  let isClamped = false;
+  const targetPos = Math.max(0, Math.min(100, getSvgX(targetTime)));
 
-  if (rawTargetPos < 2) { rawTargetPos = 2; isClamped = true; }
-  if (rawTargetPos > 98) { rawTargetPos = 98; isClamped = true; }
-  
-  const targetPos = rawTargetPos;
-
-  // Tooltip Mouse
+  // Manipulação do Mouse
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    setHoverX((x / rect.width) * 100);
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    setHoverX(Math.max(0, Math.min(100, x)));
   };
 
-  const hoverValue = hoverX !== null 
-    ? (startX + (hoverX / 100) * (endX - startX)).toFixed(1)
-    : null;
+  // Calcula o valor em minutos para mostrar no texto
+  const getHoverValue = () => {
+    if (hoverX === null) return 0;
+    return startX + (hoverX / 100) * (endX - startX);
+  };
 
   return (
-    <div className="w-full h-full relative select-none font-sans group">
+    <div className="w-full h-full relative select-none font-sans group rounded-2xl bg-gradient-to-b from-slate-800/40 to-transparent p-4 border border-slate-700/30">
       <svg 
         viewBox="0 0 100 100" 
-        preserveAspectRatio="none" 
-        className="w-full h-full overflow-visible"
-        onMouseMove={handleMouseMove}
+        preserveAspectRatio="xMidYMid meet" 
+        className="w-full h-full"
+        onMouseMove={handleMouseMove} 
         onMouseLeave={() => setHoverX(null)}
       >
         <defs>
-          <linearGradient id="purpleGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#818cf8" stopOpacity="0.5" />
-            <stop offset="90%" stopColor="#818cf8" stopOpacity="0.05" />
+          <linearGradient id="curveGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#818cf8" stopOpacity="0.7" />
+            <stop offset="50%" stopColor="#6366f1" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#4f46e5" stopOpacity="0.05" />
           </linearGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="0.5" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
         </defs>
 
-        {/* Linha de Base */}
-        <line x1="0" y1="95" x2="100" y2="95" stroke="#475569" strokeWidth="0.5" />
-
-        {/* Área Colorida */}
-        <path d={areaD} fill="url(#purpleGradient)" stroke="none" />
+        {/* Eixo Base */}
+        <line x1="0" y1="95" x2="100" y2="95" stroke="#334155" strokeWidth="0.4" />
         
-        {/* Linha da Curva */}
-        <path d={pathD} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        {/* Curva */}
+        <path d={areaD} fill="url(#curveGradient)" stroke="none" />
+        <path d={pathD} fill="none" stroke="#818cf8" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" filter="url(#glow)" vectorEffect="non-scaling-stroke" />
+        
+        {/* Linha Média */}
+        <line x1={meanPos} y1="95" x2={meanPos} y2="15" stroke="#34d399" strokeWidth="0.9" strokeDasharray="4 2" />
+        <text x={meanPos} y={98} fill="#10b981" fontSize="4.5" textAnchor="middle" fontWeight="600">Média</text>
 
-        {/* Linha da Média (Central) */}
-        <line x1={meanPos} y1={95} x2={meanPos} y2={10} stroke="#94a3b8" strokeWidth="1" strokeDasharray="3" opacity="0.5" />
+        {/* Linha Meta */}
+        <line x1={targetPos} y1="95" x2={targetPos} y2="10" stroke="#f87171" strokeWidth="1" strokeDasharray="3 2" />
+        <text x={targetPos} y={8} fill="#f87171" fontSize="4.5" fontWeight="bold" textAnchor="middle">META</text>
 
-        {/* --- LINHA VERMELHA (META) --- */}
-        {!isNaN(targetPos) && (
-           <g className="transition-all duration-300 ease-out">
-             {/* A Linha */}
-             <line 
-                x1={targetPos} y1={95} x2={targetPos} y2={5} 
-                stroke="#f87171" 
-                strokeWidth={isClamped ? 3 : 2} 
-                strokeDasharray={isClamped ? "" : "4 2"} 
-                className={isClamped ? "opacity-50" : "opacity-100"}
-             />
-             {/* O Texto "META" no topo da linha */}
-             <text x={targetPos} y={4} fill="#f87171" fontSize="4" fontWeight="bold" textAnchor="middle">META</text>
-           </g>
-        )}
-
-        {/* Tooltip Linha Mouse */}
+        {/* INTERAÇÃO DO MOUSE (TOOLTIP) */}
         {hoverX !== null && (
-          <line x1={hoverX} y1={95} x2={hoverX} y2={10} stroke="#cbd5e1" strokeWidth="0.5" />
+          <g>
+            {/* Linha Vertical pontilhada */}
+            <line x1={hoverX} y1="95" x2={hoverX} y2="15" stroke="#94a3b8" strokeWidth="0.7" strokeDasharray="2" strokeOpacity="0.9" />
+            
+            {/* Caixa de Texto */}
+            <g transform={`translate(${Math.min(Math.max(hoverX - 22, 0), 56)}, 5)`}>
+              <rect x="0" y="0" width="44" height="22" rx="5" fill="#0f172a" stroke="#475569" strokeWidth="0.4" fillOpacity="0.96" />
+              <text x="22" y="7" fill="#64748b" fontSize="3.2" textAnchor="middle" fontWeight="600">ESTIMATIVA</text>
+              <text x="22" y="16" fill="#f8fafc" fontSize="4.8" textAnchor="middle" fontWeight="bold">
+                {getHoverValue().toFixed(0)} min
+              </text>
+            </g>
+          </g>
         )}
       </svg>
-
-      {/* Label Média na base */}
-      <div className="absolute bottom-0 text-[10px] text-slate-400 transform -translate-x-1/2 flex flex-col items-center pointer-events-none" style={{ left: `${meanPos}%` }}>
-        <span className="bg-slate-900 px-1 rounded text-xs font-bold text-white">{safeMean.toFixed(0)}</span>
-      </div>
-
-      {/* Tooltip Flutuante */}
-      {hoverX !== null && (
-        <div className="absolute top-1/2 bg-slate-900/90 backdrop-blur border border-slate-600 p-2 rounded shadow-xl pointer-events-none transform -translate-x-1/2 -translate-y-1/2 z-50 min-w-[80px]" style={{ left: `${hoverX}%` }}>
-          <p className="text-[10px] text-slate-400 text-center uppercase">Tempo</p>
-          <p className="text-lg font-bold text-white text-center">{hoverValue} <span className="text-xs font-normal">min</span></p>
-        </div>
-      )}
     </div>
   );
 };

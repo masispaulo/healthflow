@@ -53,6 +53,16 @@ export interface FatigueResult {
       };
   };
   
+  /** Normaliza startTime/endTime para Date (aceita HH:mm, ISO, Timestamp) */
+  const parseProcTime = (val: any): Date => {
+    if (!val) return new Date(0);
+    if (val && typeof val.toDate === 'function') return val.toDate();
+    const str = String(val);
+    if (/^\d{1,2}:\d{2}/.test(str)) return new Date(`2000-01-01T${str}`);
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? new Date(0) : d;
+  };
+
   export const calculateFatigueScore = (procedures: any[]): FatigueResult => {
     let score = 0;
     let totalDayMin = 0;
@@ -66,13 +76,15 @@ export interface FatigueResult {
         };
     }
   
-    // Ordena cronologicamente
-    const sortedProcs = [...procedures].sort((a, b) => a.startTime.localeCompare(b.startTime));
+    const sortedProcs = [...procedures]
+      .map(p => ({ ...p, _start: parseProcTime(p.startTime), _end: parseProcTime(p.endTime) }))
+      .filter(p => !isNaN(p._start.getTime()) && !isNaN(p._end.getTime()))
+      .sort((a, b) => a._start.getTime() - b._start.getTime());
   
     sortedProcs.forEach(proc => {
-        const start = new Date(`2000-01-01T${proc.startTime}`);
-        const end = new Date(`2000-01-01T${proc.endTime}`);
-        if (end < start) end.setDate(end.getDate() + 1); // Passou da meia-noite
+        const start = new Date(proc._start);
+        const end = new Date(proc._end);
+        if (end < start) end.setDate(end.getDate() + 1);
   
         // Separa o tempo biológico
         const { day, night } = splitDayNightMinutes(start, end);
@@ -104,8 +116,8 @@ export interface FatigueResult {
         }
     });
   
-    // O Score não pode ser negativo (mínimo zero = descansado)
     if (score < 0) score = 0;
+    if (isNaN(score) || !isFinite(score)) score = 0;
   
     // Classificação dos Alertas (16.9 e 20.0)
     let status: 'SAFE' | 'WARNING' | 'CRITICAL' = 'SAFE';
@@ -127,9 +139,9 @@ export interface FatigueResult {
         status,
         label,
         color,
-        dayMinutes: totalDayMin,
-        nightMinutes: totalNightMin,
-        recoveryMinutes: totalRecoveryMin,
-        limitRatio: Math.min((score / CONSTANTS.LIMIT_CRITICAL) * 100, 100)
+        dayMinutes: isNaN(totalDayMin) ? 0 : totalDayMin,
+        nightMinutes: isNaN(totalNightMin) ? 0 : totalNightMin,
+        recoveryMinutes: isNaN(totalRecoveryMin) ? 0 : totalRecoveryMin,
+        limitRatio: Math.min(((isNaN(score) ? 0 : score) / CONSTANTS.LIMIT_CRITICAL) * 100, 100)
     };
   };

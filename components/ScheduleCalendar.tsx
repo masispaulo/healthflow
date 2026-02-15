@@ -19,7 +19,7 @@ const formatDateForInput = (date: Date) => {
 
 const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ 
   user, 
-  locations, // Removi o valor padrão [] para o "undefined" funcionar na verificação de carregamento
+  locations, 
   selectedShiftId, 
   onSelectShift,
   preSelectedDate 
@@ -34,6 +34,7 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // EFEITO: Preenche o formulário quando seleciona um plantão ou uma data
   useEffect(() => {
     if (selectedShiftId && shifts.length > 0) {
       const shiftToEdit = shifts.find(s => s.id === selectedShiftId);
@@ -46,11 +47,13 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
     } else {
       if (!selectedShiftId) {
           setTitle('');
+          // Se tiver data pré-selecionada (clique no calendário), usa ela
           const baseDate = preSelectedDate || new Date();
           const startDate = new Date(baseDate);
           startDate.setMinutes(0);
+          
           const endDate = new Date(startDate);
-          endDate.setHours(endDate.getHours() + 12);
+          endDate.setHours(endDate.getHours() + 12); // Padrão 12h
 
           setStartStr(formatDateForInput(startDate));
           setEndStr(formatDateForInput(endDate));
@@ -90,12 +93,12 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
           title, locationId, startTime: startDate, endTime: endDate
         });
         alert("Escala atualizada!");
-        onSelectShift(null); 
+        onSelectShift(null); // Limpa seleção
       } else {
         await addShift({
           title, locationId, startTime: startDate, endTime: endDate
         });
-        setTitle('');
+        setTitle(''); // Limpa título para o próximo
         alert("Plantão criado com sucesso!");
       }
     } catch (err: any) {
@@ -135,7 +138,6 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
           />
         </div>
 
-        {/* --- CORREÇÃO DO SELECT DE LOCAIS --- */}
         <div className="space-y-1">
           <label className="text-sm font-medium text-slate-300 flex items-center gap-1">
             <MapPinIcon className="w-4 h-4" /> Local
@@ -146,7 +148,6 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
             className="w-full bg-slate-900 border border-slate-600 rounded-md p-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
           >
             <option value="" disabled>Selecione...</option>
-            
             {locations === undefined ? (
               <option disabled>Carregando...</option>
             ) : locations.length === 0 ? (
@@ -158,7 +159,6 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
                 </option>
               ))
             )}
-            
           </select>
         </div>
 
@@ -175,7 +175,7 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
 
         {error && <div className="p-3 bg-red-900/50 border border-red-800 rounded text-red-200 text-sm">{error}</div>}
 
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-slate-800 border-t border-slate-700 z-50 md:relative md:bg-transparent md:border-0 md:p-0 md:pt-4 flex gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.3)] md:shadow-none">
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-slate-800 border-t border-slate-700 z-[10001] md:relative md:z-auto md:bg-transparent md:border-0 md:p-0 md:pt-4 flex gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.3)] md:shadow-none">
           {selectedShiftId ? (
             <>
               <button type="button" onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white p-3 rounded flex justify-center items-center"><TrashIcon className="w-5 h-5"/></button>

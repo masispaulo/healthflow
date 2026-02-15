@@ -1,0 +1,112 @@
+[
+    {
+      "id": "1",
+      "nomeComercial": "Dipirona Monohidratada",
+      "principioAtivo": "Dipirona",
+      "laboratorio": "Medley",
+      "apresentacao": "500mg - 10 comprimidos",
+      "categoria": "Analgésico e Antitérmico",
+      "indicacoes": "Indicado para dor e febre.",
+      "contraIndicacoes": "Alergia a dipirona, gravidez (consultar médico), asma induzida por analgésicos.",
+      "uso": "Oral"
+    },
+    {
+      "id": "2",
+      "nomeComercial": "Tylenol",
+      "principioAtivo": "Paracetamol",
+      "laboratorio": "Janssen",
+      "apresentacao": "750mg - 20 comprimidos",
+      "categoria": "Analgésico e Antitérmico",
+      "indicacoes": "Redução da febre e alívio temporário de dores leves a moderadas.",
+      "contraIndicacoes": "Hipersensibilidade ao paracetamol ou doença grave do fígado.",
+      "uso": "Oral"
+    },
+    {
+      "id": "3",
+      "nomeComercial": "Amoxicilina",
+      "principioAtivo": "Amoxicilina",
+      "laboratorio": "EMS",
+      "apresentacao": "500mg - 21 cápsulas",
+      "categoria": "Antibiótico",
+      "indicacoes": "Infecções bacterianas (amigdalite, sinusite, otite, infecções urinárias).",
+      "contraIndicacoes": "Alergia a penicilinas e cefalosporinas.",
+      "uso": "Oral"
+    },
+    {
+      "id": "4",
+      "nomeComercial": "Dorflex",
+      "principioAtivo": "Dipirona, Citrato de Orfenadrina, Cafeína",
+      "laboratorio": "Sanofi",
+      "apresentacao": "36 comprimidos",
+      "categoria": "Relaxante Muscular",
+      "indicacoes": "Alívio da dor associada a contraturas musculares, incluindo dor de cabeça tensional.",
+      "contraIndicacoes": "Glaucoma, obstrução do piloro ou duodenal, problemas no esôfago.",
+      "uso": "Oral"
+    },
+    {
+      "id": "5",
+      "nomeComercial": "Losartana Potássica",
+      "principioAtivo": "Losartana",
+      "laboratorio": "Neo Química",
+      "apresentacao": "50mg - 30 comprimidos",
+      "categoria": "Anti-hipertensivo",
+      "indicacoes": "Tratamento da hipertensão arterial (pressão alta) e insuficiência cardíaca.",
+      "contraIndicacoes": "Gravidez, alergia aos componentes, uso concomitante com alisquireno em diabéticos.",
+      "uso": "Oral"
+    },
+    {
+      "id": "6",
+      "nomeComercial": "Rivotril",
+      "principioAtivo": "Clonazepam",
+      "laboratorio": "Roche",
+      "apresentacao": "2.5mg/ml (Gotas) - 20ml",
+      "categoria": "Ansiolítico (Controlado)",
+      "indicacoes": "Transtornos de ansiedade, pânico, fobia social e epilepsia.",
+      "contraIndicacoes": "Insuficiência respiratória grave, apneia do sono, problemas graves no fígado.",
+      "uso": "Oral"
+    },
+    {
+      "id": "7",
+      "nomeComercial": "Omeprazol",
+      "principioAtivo": "Omeprazol",
+      "laboratorio": "Teuto",
+      "apresentacao": "20mg - 28 cápsulas",
+      "categoria": "Gastrointestinal",
+      "indicacoes": "Úlceras gástricas, refluxo gastroesofágico, acidez estomacal.",
+      "contraIndicacoes": "Hipersensibilidade ao omeprazol.",
+      "uso": "Oral"
+    },
+    {
+      "id": "8",
+      "nomeComercial": "Buscopan Composto",
+      "principioAtivo": "Butilbrometo de escopolamina, Dipirona",
+      "laboratorio": "Boehringer Ingelheim",
+      "apresentacao": "20 comprimidos",
+      "categoria": "Antiespasmódico",
+      "indicacoes": "Cólicas abdominais, cólicas menstruais e dores em geral.",
+      "contraIndicacoes": "Megacólon, miastenia gravis, alergia a pirazolonas.",
+      "uso": "Oral"
+    },
+    {
+      "id": "9",
+      "nomeComercial": "Ibuprofeno",
+      "principioAtivo": "Ibuprofeno",
+      "laboratorio": "Prati-Donaduzzi",
+      "apresentacao": "600mg - 20 comprimidos",
+      "categoria": "Anti-inflamatório",
+      "indicacoes": "Febre e dores leves a moderadas, dor de garganta, dor de dente.",
+      "contraIndicacoes": "Histórico de úlcera, sangramento gastrointestinal, insuficiência cardíaca grave.",
+      "uso": "Oral"
+    },
+    {
+      "id": "10",
+      "nomeComercial": "Xarope Vick Mel",
+      "principioAtivo": "Guaifenesina",
+      "laboratorio": "P&G",
+      "apresentacao": "240ml",
+      "categoria": "Expectorante",
+      "indicacoes": "Ajuda na eliminação do catarro em tosses produtivas.",
+      "contraIndicacoes": "Hipersensibilidade à guaifenesina.",
+      "uso": "Oral"
+    }
+  ]

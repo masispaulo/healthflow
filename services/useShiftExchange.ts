@@ -31,8 +31,7 @@ export const useShiftExchange = (user: User | null) => {
   useEffect(() => {
     if (!user || !user.email) return;
 
-    // A: Solicitações que EU recebi
-    // ATENÇÃO: Use 'shift_requests' (com underline) conforme suas regras
+    // A: Solicitações que EU recebi (seja de médico ou do gerente)
     const qIncoming = query(
       collection(db, 'shift_requests'),
       where('toUserEmail', '==', user.email),
@@ -46,7 +45,7 @@ export const useShiftExchange = (user: User | null) => {
     return () => { unsubIncoming(); };
   }, [user]);
 
-  // 2. ENVIAR SOLICITAÇÃO
+  // 2. ENVIAR SOLICITAÇÃO (Uso entre médicos)
   const sendRequest = async (targetEmail: string, shift: any) => {
     if (!user || !user.email) throw new Error("Usuário não autenticado");
     setLoading(true);
@@ -69,36 +68,63 @@ export const useShiftExchange = (user: User | null) => {
     }
   };
 
-  // 3. ACEITAR SOLICITAÇÃO (A Mágica acontece aqui) 🎩✨
+  // 3. ACEITAR SOLICITAÇÃO (Onde a mágica acontece) 🎩✨
   const acceptRequest = async (request: ShiftRequest) => {
     if (!user) return;
     setLoading(true);
 
     try {
-      // TRATAMENTO DE DATAS: Converte string ISO de volta para Objeto Date
-      // Isso é vital para o Calendário reconhecer o plantão
+      // TRATAMENTO DE DATAS
       const newStart = new Date(request.shiftData.startTime);
       const newEnd = new Date(request.shiftData.endTime);
 
-      // Adiciona o plantão na MINHA agenda
-      await addDoc(collection(db, 'users', user.uid, 'shifts'), {
-        ...request.shiftData,
-        startTime: newStart, // Data corrigida
-        endTime: newEnd,     // Data corrigida
-        title: `${request.shiftData.title} (Transferido)`,
-        color: '#10B981', // Verde (Indica sucesso/novo)
+      // A. Adiciona o plantão na MINHA agenda
+      const shiftRef = await addDoc(collection(db, 'users', user.uid, 'shifts'), {
+        startTime: newStart,
+        endTime: newEnd,
+        locationName: request.shiftData.locationName || 'Unidade Central',
+        title: request.shiftData.title || 'Plantão Aceito',
+        color: '#10B981', // Verde
+        status: 'CONFIRMED',
+        type: 'WORK',
         transferredFrom: request.fromUserEmail,
-        originalOwnerId: request.fromUserId
+        originalOwnerId: request.fromUserId,
+        createdAt: new Date()
       });
 
-      // Marca a solicitação como ACEITA no banco de trocas
+      // B. (NOVO) Se tiver pacientes no pacote, salva eles na sub-coleção procedures
+      // Cada paciente usa scheduledAt para startTime/endTime (compatível com painel médico + 1 clique)
+      if (request.shiftData.patients && Array.isArray(request.shiftData.patients) && request.shiftData.patients.length > 0) {
+        const batchPromises = request.shiftData.patients.map((p: any) => {
+          const patientStart = p.scheduledAt ? new Date(p.scheduledAt) : newStart;
+          const patientEnd = new Date(patientStart.getTime() + 30 * 60000); // 30 min padrão
+
+          return addDoc(collection(db, 'users', user.uid, 'shifts', shiftRef.id, 'procedures'), {
+            patientName: p.patientName,
+            name: p.procedureType || 'Consulta',
+            age: p.age || '',
+            bed: p.bed || '',
+            diagnosis: p.diagnosis || '',
+            priority: p.priority || 'MEDIA',
+            status: 'AGUARDANDO',
+            type: 'WORK',
+            startTime: patientStart.toISOString(),
+            endTime: patientEnd.toISOString(),
+            source: 'hospital',
+            createdAt: new Date()
+          });
+        });
+        await Promise.all(batchPromises);
+      }
+
+      // C. Marca a solicitação como ACEITA
       await updateDoc(doc(db, 'shift_requests', request.id), {
         status: 'accepted',
         acceptedBy: user.email,
         acceptedAt: serverTimestamp()
       });
       
-      alert("Plantão aceito! Ele já deve aparecer no seu calendário.");
+      alert("✅ Plantão aceito! Pacientes e horários adicionados à sua agenda.");
     } catch (error) {
       console.error("Erro ao aceitar:", error);
       alert("Erro ao aceitar a troca.");

@@ -16,9 +16,12 @@
     "@capacitor/ios": "^8.0.0",
     "@google/genai": "^1.21.0",
     "firebase": "^12.6.0",
+    "firebase-admin": "^13.6.0",
     "lucide-react": "^0.562.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-firebase-hooks": "^5.1.1",
+    "react-router-dom": "^7.11.0",
     "recharts": "^3.6.0",
     "serve": "^14.2.5",
     "vite": "^6.2.0"

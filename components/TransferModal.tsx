@@ -81,7 +81,7 @@ const TransferModal: React.FC<TransferModalProps> = ({ isOpen, onClose, user, sh
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+    <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
       <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-6 shadow-2xl animate-slide-up">
         <h2 className="text-xl font-bold text-white mb-4">Transferir Plantão</h2>
 
